@@ -1,0 +1,142 @@
+import asyncio
+import random
+from dataclasses import replace
+
+import pytest
+
+from keyword_reply.models import ConfigError
+from keyword_reply.policy import RuntimePolicy
+from keyword_reply.service import ReplyService
+from keyword_reply.storage import StateStore
+
+
+@pytest.fixture
+def service(snapshot, tmp_path):
+    return ReplyService(
+        snapshot,
+        RuntimePolicy(lambda: 100, random.Random(1)),
+        StateStore(tmp_path / "state.json"),
+        clock=lambda: 100,
+    )
+
+
+async def test_success_and_duplicate(service, message):
+    sent = []
+
+    async def send(text):
+        sent.append(text)
+
+    assert (await service.handle(message, send)).sent_rule_ids == ("echo",)
+    assert (await service.handle(message, send)).reason == "duplicate"
+    assert sent == ["是啊吃什么"]
+
+
+async def test_send_failure_does_not_advance_cursor(service, message):
+    before = service.policy.export_persistent()
+
+    async def broken(text):
+        raise OSError("OneBot unavailable")
+
+    result = await service.handle(message, broken)
+    assert result.sent_rule_ids == () and result.reason == "send_failed"
+    assert service.policy.export_persistent() == before
+
+
+async def test_reload_preserves_snapshot_on_global_error(service):
+    old = service.snapshot
+    with pytest.raises(ConfigError):
+        await service.apply_config({"enabled": "false"}, "r2")
+    assert service.snapshot is old
+
+
+async def test_diagnose_no_side_effects(service, message):
+    before = (
+        service.policy.export_persistent(),
+        service.policy.rng.getstate(),
+        dict(service.policy.stats),
+    )
+    report = await service.diagnose(message, "echo")
+    assert "吃" in report and "是啊吃什么" in report
+    assert (
+        service.policy.export_persistent(),
+        service.policy.rng.getstate(),
+        dict(service.policy.stats),
+    ) == before
+    assert not service.store.path.exists()
+
+
+async def test_management_save_failure_rolls_back(service, message, monkeypatch):
+    async def fail(data):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(service.store, "save", fail)
+    with pytest.raises(OSError):
+        await service.update_runtime("pause", None, message.scope, False)
+    assert service.policy.runtime_reason(message.scope) is None
+
+
+async def test_runtime_persists_and_here_does_not_pause_other_groups(service, message):
+    await service.update_runtime("pause", None, message.scope, False)
+    data = await service.store.load()
+    fresh = RuntimePolicy()
+    fresh.restore_persistent(data)
+    assert fresh.runtime_reason(message.scope) == "disabled"
+    assert fresh.runtime_reason(replace(message.scope, target_id="other")) is None
+
+
+async def test_busy_pool_does_not_queue(service, message):
+    tokens = [service._permits.get_nowait(), service._permits.get_nowait()]
+
+    async def send(text):
+        raise AssertionError("should not send")
+
+    assert (await service.handle(message, send)).reason == "busy"
+    for token in tokens:
+        service._permits.put_nowait(token)
+
+
+async def test_cancellation_releases_reservation(service, message):
+    started = asyncio.Event()
+
+    async def wait_send(text):
+        started.set()
+        await asyncio.Event().wait()
+
+    task = asyncio.create_task(service.handle(message, wait_send))
+    await started.wait()
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert not service.policy._active
+    assert service.policy._dedup
+
+
+async def test_partial_success_and_reload_deletion(service, raw_rule, message):
+    await service.apply_config(
+        {"selection_mode": "all", "rules": [raw_rule, dict(raw_rule, id="other", replies=["bad"])]},
+        "r2",
+    )
+
+    async def send(text):
+        if text == "bad":
+            raise OSError("fail")
+
+    result = await service.handle(message, send)
+    assert result.sent_rule_ids == ("echo",)
+    await service.apply_config({"rules": []}, "r3")
+    assert service.snapshot.rules == ()
+
+
+async def test_round_robin_flushed_on_close(service, raw_rule, message):
+    await service.apply_config(
+        {"rules": [dict(raw_rule, replies=["a", "b"], reply_mode="round_robin")]}, "r2"
+    )
+
+    async def send(text):
+        pass
+
+    await service.handle(message, send)
+    await service.close()
+    await service.close()
+    state = await StateStore(service.store.path).load()
+    assert list(state["cursors"].values()) == [1]
