@@ -38,7 +38,9 @@ REASONS = {
 
 
 class ReplyService:
-    def __init__(self, snapshot, policy, store, clock=time.monotonic, config_path=None):
+    def __init__(
+        self, snapshot, policy, store, clock=time.monotonic, config_path=None, preserve_state=False
+    ):
         self.snapshot = snapshot
         self.policy = policy
         self.store = store
@@ -57,11 +59,19 @@ class ReplyService:
         self._background = []
         self._closed = False
         self._saved_revision = -1
-        self.policy.retain_rules({r.rule.id for r in snapshot.rules})
+        self._preserve_state = preserve_state
+        self._retain_rules()
+
+    def _retain_rules(self):
+        if not self._preserve_state:
+            ids = {r.rule.id for r in self.snapshot.rules} | {
+                i.rule_id for i in self.snapshot.issues if i.rule_id
+            }
+            self.policy.retain_rules(ids)
 
     async def initialize(self):
         self.policy.restore_persistent(await self.store.load())
-        self.policy.retain_rules({r.rule.id for r in self.snapshot.rules})
+        self._retain_rules()
         self.last_error = self.store.warning
         self._background.append(asyncio.create_task(self._flush_loop()))
         if self.config_path:
@@ -152,7 +162,8 @@ class ReplyService:
             self.snapshot = snapshot
             self.config_issues = snapshot.issues
             self.last_error = ""
-            self.policy.retain_rules({r.rule.id for r in snapshot.rules})
+            self._preserve_state = False
+            self._retain_rules()
             return snapshot.issues
 
     async def reload_config(self):
@@ -172,6 +183,7 @@ class ReplyService:
             data = proposal.export_persistent()
             await self.store.save(data)
             self.policy.apply_controls(data)
+            self._retain_rules()
             self._saved_revision = data["revision"]
 
     async def flush(self):

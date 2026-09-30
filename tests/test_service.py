@@ -49,6 +49,15 @@ async def test_reload_preserves_snapshot_on_global_error(service):
     assert service.snapshot is old
 
 
+async def test_temporarily_invalid_rule_keeps_runtime_disable(service, message, raw_rule):
+    await service.update_runtime("off", "echo", message.scope, True)
+    broken = dict(raw_rule, pattern="(", match_type="regex")
+    await service.apply_config({"rules": [broken]}, "bad_rule")
+    assert service.policy.export_persistent()["global_disabled"] == ["echo"]
+    await service.apply_config({"rules": [raw_rule]}, "repaired")
+    assert service.policy.runtime_reason(message.scope, "echo") == "disabled"
+
+
 async def test_diagnose_no_side_effects(service, message):
     before = (
         service.policy.export_persistent(),
