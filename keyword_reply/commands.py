@@ -2,6 +2,7 @@ import json
 import re
 from dataclasses import dataclass, replace
 
+from .policy import scope_id
 from .scope import scope_reason
 from .service import REASONS
 
@@ -42,7 +43,9 @@ def parse_command(text: str) -> ParsedCommand | None:
             raise ValueError("用法：kwr test|testat <规则ID|all> <正文>")
         return ParsedCommand(action, None if body[1] == "all" else body[1], text=body[2])
     args = rest.split()
-    if action in {"help", "validate", "reload", "status", "stats"} and not args:
+    if action == "stats" and len(args) <= 1:
+        return ParsedCommand(action, args[0] if args else None)
+    if action in {"help", "validate", "reload", "status"} and not args:
         return ParsedCommand(action)
     if action == "list" and len(args) <= 1:
         if args and (
@@ -124,8 +127,33 @@ async def _execute(service, command, context):
         reason = scope_reason(rule, context) or service.policy.runtime_reason(
             context.scope, rule.id
         )
-        return f"当前限制：{REASONS.get(reason, reason) if reason else '无'}\n" + json.dumps(
-            asdict(rule), ensure_ascii=False, indent=2
+        data = service.policy.export_persistent()
+        here = data["scopes"].get(scope_id(context.scope), {"paused": False, "disabled": []})
+        sources = []
+        if data["global_paused"] or rule.id in data["global_disabled"]:
+            sources.append("global")
+        if here["paused"] or rule.id in here["disabled"]:
+            sources.append("here")
+        now = service.clock()
+        cooldowns = {
+            "会话总冷却": service.policy._cooldowns.get(("group", context.scope), 0),
+            "会话规则冷却": service.policy._cooldowns.get(("rule", context.scope, rule.id), 0),
+            "用户规则冷却": service.policy._cooldowns.get(
+                ("user", context.scope, rule.id, context.user_id), 0
+            ),
+        }
+        example = (
+            rule.pattern
+            if rule.match_type in {"template", "regex"}
+            else (rule.keywords[0] if rule.keywords else "")
+        )
+        details = (
+            f"禁用来源：{','.join(sources) or '无'}\n匹配示例/表达式：{example}\n"
+            + "；".join(f"{k}剩余{max(0, v - now):.1f}秒" for k, v in cooldowns.items())
+        )
+        return (
+            f"当前限制：{REASONS.get(reason, reason) if reason else '无'}\n{details}\n"
+            + json.dumps(asdict(rule), ensure_ascii=False, indent=2)
         )
     if action in {"on", "off", "pause", "resume", "reset"}:
         await service.update_runtime(
@@ -135,7 +163,11 @@ async def _execute(service, command, context):
         if not service.snapshot.settings.enabled:
             remaining = "disabled"
         if command.rule_id:
-            rule = next(c.rule for c in service.snapshot.rules if c.rule.id == command.rule_id)
+            rule = next(
+                (c.rule for c in service.snapshot.rules if c.rule.id == command.rule_id), None
+            )
+            if rule is None:
+                return "配置已变化：规则已删除或无效，已清理其运行覆盖。"
             remaining = scope_reason(rule, context) or remaining
         return f"已执行 {action}（{command.scope}）。剩余限制：{REASONS.get(remaining, remaining) if remaining else '无'}。"
     if action in {"validate", "reload"}:
@@ -160,7 +192,14 @@ async def _execute(service, command, context):
         }
         return "\n".join(f"{labels[k]}：{v}" for k, v in service.status(context).items())
     if action == "stats":
-        return "本次加载以来统计（重载后清零）：\n" + "\n".join(
-            f"{REASONS.get(k, k)}：{v}" for k, v in service.policy.stats.items()
+        if command.rule_id and command.rule_id not in {c.rule.id for c in service.snapshot.rules}:
+            raise ValueError("规则不存在或配置无效")
+        counters = (
+            service.policy.rule_stats.get(command.rule_id, {})
+            if command.rule_id
+            else service.policy.stats
+        )
+        return f"本次加载以来统计 {command.rule_id or '全部'}（重载后清零）：\n" + "\n".join(
+            f"{REASONS.get(k, k)}：{v}" for k, v in counters.items()
         )
     raise ValueError("未知操作")

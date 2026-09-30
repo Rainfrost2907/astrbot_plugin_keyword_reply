@@ -312,6 +312,9 @@ class RuntimePolicy:
         self._data["global_disabled"] = [x for x in self._data["global_disabled"] if x in ids]
         for value in self._data["scopes"].values():
             value["disabled"] = [x for x in value["disabled"] if x in ids]
+        self._data["scopes"] = {
+            k: v for k, v in self._data["scopes"].items() if v["paused"] or v["disabled"]
+        }
         self._data["cursors"] = {
             k: v for k, v in self._data["cursors"].items() if json.loads(k)[-1] in ids
         }

@@ -53,9 +53,12 @@ def _parse(cls, raw, prefix, rule_id=None):
         elif expected == "int":
             valid = type(value) is int
         elif expected == "float":
-            valid = type(value) in (int, float) and math.isfinite(value)
-            if valid:
-                value = float(value)
+            try:
+                valid = type(value) in (int, float) and math.isfinite(value)
+                if valid:
+                    value = float(value)
+            except OverflowError:
+                valid = False
         elif expected == "str":
             valid = isinstance(value, str)
         else:

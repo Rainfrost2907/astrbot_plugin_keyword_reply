@@ -34,6 +34,8 @@ REASONS = {
     "eligible": "可参与回复选择",
     "input_too_long": "消息过长",
     "sent": "已发送",
+    "ignored_prefix": "正文命中忽略的命令前缀",
+    "self_message": "忽略机器人自身消息",
 }
 
 
@@ -116,12 +118,9 @@ class ReplyService:
 
     async def _handle(self, message, send):
         snapshot = self.snapshot
-        if message.user_id == message.scope.bot_id:
-            return HandleResult("scope_denied")
-        if any(
-            message.text.lstrip().startswith(p) for p in snapshot.settings.ignore_command_prefixes
-        ):
-            return HandleResult("no_match")
+        reason = self.entry_reason(snapshot, message)
+        if reason:
+            return HandleResult("scope_denied" if reason == "self_message" else "no_match")
         evaluation = await self._evaluate(snapshot, message)
         if evaluation is None:
             self.policy.record("busy")
@@ -195,6 +194,9 @@ class ReplyService:
 
     async def diagnose(self, message, rule_id=None):
         snapshot = self.snapshot
+        reason = self.entry_reason(snapshot, message)
+        if reason:
+            return "总体结论：不自动回复，" + REASONS[reason] + "。测试没有状态副作用。"
         if rule_id:
             selected = tuple(r for r in snapshot.rules if r.rule.id == rule_id)
             if not selected:
@@ -231,6 +233,19 @@ class ReplyService:
             if not rule_id or i.rule_id == rule_id
         )
         return "\n".join(lines)
+
+    @staticmethod
+    def entry_reason(snapshot, message):
+        if message.user_id == message.scope.bot_id:
+            return "self_message"
+        if any(
+            message.text.lstrip().startswith(p) for p in snapshot.settings.ignore_command_prefixes
+        ):
+            return "ignored_prefix"
+        head = message.text.lstrip().split(maxsplit=1)
+        if head and head[0] in {"kwr", "关键词回复"}:
+            return "ignored_prefix"
+        return None
 
     async def _flush_loop(self):
         while True:

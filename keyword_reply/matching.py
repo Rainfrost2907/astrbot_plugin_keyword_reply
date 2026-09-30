@@ -48,25 +48,31 @@ class CompiledMatcher:
             return None
         text = fold(original, rule.ignore_case) if rule.match_type != "regex" else original
         if self.pattern is not None:
-            operation = (
-                self.pattern.fullmatch if rule.match_scope == "full" else self.pattern.search
+            matches = (
+                (self.pattern.fullmatch(text, timeout=timeout_s),)
+                if rule.match_scope == "full"
+                else self.pattern.finditer(text, timeout=timeout_s, overlapped=True)
             )
-            found = operation(text, timeout=timeout_s)
-            if found is None:
-                return None
-            start, end = found.span()
-            if start == end:
-                return None
-            matched = original[start:end]
-            if rule.match_type == "template":
-                a, b = found.span("kw")
-                keyword = original[a:b]
-                if not keyword.strip() or not rule.capture_min <= len(keyword) <= rule.capture_max:
-                    return None
-                return Match(keyword, matched, {})
-            groups = {str(i): found.group(i) or "" for i in range(1, self.pattern.groups + 1)}
-            groups.update({k: v or "" for k, v in found.groupdict().items()})
-            return Match(matched, matched, groups)
+            for found in matches:
+                if found is None:
+                    continue
+                start, end = found.span()
+                if start == end:
+                    continue
+                matched = original[start:end]
+                if rule.match_type == "template":
+                    a, b = found.span("kw")
+                    keyword = original[a:b]
+                    if (
+                        not keyword.strip()
+                        or not rule.capture_min <= len(keyword) <= rule.capture_max
+                    ):
+                        continue
+                    return Match(keyword, matched, {})
+                groups = {str(i): found.group(i) or "" for i in range(1, self.pattern.groups + 1)}
+                groups.update({k: v or "" for k, v in found.groupdict().items()})
+                return Match(matched, matched, groups)
+            return None
         hits = []
         for order, keyword in enumerate(rule.keywords):
             word = fold(keyword, rule.ignore_case)
