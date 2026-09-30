@@ -1,8 +1,8 @@
 name: astrbot_plugin_keyword_reply
 display_name: 关键词回复
-version: 1.0.0
+version: 2.0.0
 author: Rainfrost
-desc: 支持关键词、句式捕获、正则、随机文字回复和管理员诊断的群聊回复插件
+desc: 简洁易用的群聊关键词与句式回复插件，支持随机文字、变量替换、适用群和@触发
 support_platforms:
   - aiocqhttp
 astrbot_version: ">=4.28,<4.29"

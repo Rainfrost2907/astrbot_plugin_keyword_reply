@@ -7,26 +7,29 @@ from dataclasses import MISSING, fields
 from .models import ConfigError, ConfigIssue, LoadedConfig, PluginConfig, Rule
 
 ENUMS = {
-    "selection_mode": {"priority", "random", "all"},
-    "match_type": {"exact", "contains", "prefix", "suffix", "template", "regex"},
-    "match_scope": {"full", "search"},
+    "match_type": {"contains", "template"},
     "capture_mode": {"any", "keywords"},
-    "chat_types": {"group", "private", "both"},
-    "reply_mode": {"first", "random", "round_robin"},
 }
-RANGES = {
-    "priority": (-10000, 10000),
-    "capture_min": (1, 1024),
-    "capture_max": (1, 1024),
-    "probability": (0, 1),
-    "max_replies": (1, 10),
-    "dedup_ttl_seconds": (10, 600),
-    "max_input_chars": (128, 16384),
-    "max_reply_chars": (1, 4000),
-    "regex_timeout_ms": (1, 50),
-    "evaluation_budget_ms": (20, 500),
-    "max_rules": (500, 500),
-}
+
+# Retirement markers only: keep AstrBot from discarding v1 constraints before validation.
+# A reserved string survives native dashboard saves; any v1 value requires a reset.
+RETIRED_SENTINEL = "__retired_in_v2__"
+RETIRED_GLOBAL_FIELDS = frozenset(
+    {
+        "allow_private",
+        "selection_mode",
+        "max_replies",
+        "dedup_ttl_seconds",
+        "max_input_chars",
+        "max_reply_chars",
+        "regex_timeout_ms",
+        "evaluation_budget_ms",
+        "max_rules",
+        "ignore_command_prefixes",
+        "blocked_user_ids",
+        "platform_ids",
+    }
+)
 
 
 def _issue(rule_id, path, message):
@@ -37,7 +40,13 @@ def _parse(cls, raw, prefix, rule_id=None):
     issues, values = [], {}
     known = {f.name for f in fields(cls)} - {"order"}
     for key in raw.keys() - known - {"__template_key"}:
-        issues.append(_issue(rule_id, prefix + str(key), "未知配置字段"))
+        issues.append(
+            _issue(
+                rule_id,
+                prefix + str(key),
+                "不支持的配置字段；2.0仅保留基础回复，请按新表单重新配置",
+            )
+        )
     for field in fields(cls):
         key = field.name
         if key == "order":
@@ -71,7 +80,7 @@ def _parse(cls, raw, prefix, rule_id=None):
         values[key] = value
         if key in ENUMS and value not in ENUMS[key]:
             issues.append(_issue(rule_id, path, "无效选项"))
-        bound = (0, 3600) if key.endswith("cooldown_seconds") else RANGES.get(key)
+        bound = (0, 3600) if key.endswith("cooldown_seconds") else None
         if bound and not bound[0] <= value <= bound[1]:
             issues.append(_issue(rule_id, path, f"必须在 {bound[0]}～{bound[1]} 之间"))
         if isinstance(value, tuple):
@@ -99,23 +108,23 @@ def _parse(cls, raw, prefix, rule_id=None):
         if not values.get("replies"):
             issues.append(_issue(rule_id, prefix + "replies", "至少配置一条回复"))
         mode = values.get("match_type")
-        if mode in {"exact", "contains", "prefix", "suffix"} or (
-            mode == "template" and values.get("capture_mode") == "keywords"
-        ):
+        if mode == "contains" or (mode == "template" and values.get("capture_mode") == "keywords"):
             if not values.get("keywords"):
                 issues.append(_issue(rule_id, prefix + "keywords", "该模式要求非空词表"))
         pattern = values.get("pattern", "")
-        if len(pattern) > 1024 or (mode in {"template", "regex"} and not pattern):
+        if len(pattern) > 1024 or (mode == "template" and not pattern):
             issues.append(_issue(rule_id, prefix + "pattern", "模式长度须为 1～1024"))
-        if values.get("capture_min", 1) > values.get("capture_max", 128):
-            issues.append(_issue(rule_id, prefix + "capture_max", "最大捕获长度不能小于最小长度"))
     return values, issues
 
 
 def load_config(raw: dict) -> LoadedConfig:
     if not isinstance(raw, dict):
         raise ConfigError((_issue(None, "$", "配置必须是对象"),))
-    settings_raw = {k: v for k, v in raw.items() if k != "rules"}
+    settings_raw = {
+        k: v
+        for k, v in raw.items()
+        if k != "rules" and not (k in RETIRED_GLOBAL_FIELDS and v == RETIRED_SENTINEL)
+    }
     values, issues = _parse(PluginConfig, settings_raw, "")
     raw_rules = raw.get("rules", [])
     if not isinstance(raw_rules, list) or len(raw_rules) > 500:

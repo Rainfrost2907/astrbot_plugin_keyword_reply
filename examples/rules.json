@@ -1,8 +1,28 @@
 {
   "rules": [
-    {"__template_key":"template","id":"template_words","name":"限定吃喝","enabled":false,"match_type":"template","pattern":"我{关键词}什么","capture_mode":"keywords","keywords":["吃","喝"],"replies":["是啊{关键词}什么"]},
-    {"__template_key":"template","id":"template_any","name":"自由接话","enabled":false,"match_type":"template","pattern":"我{关键词}什么","capture_mode":"any","replies":["是啊{关键词}什么"]},
-    {"__template_key":"keyword","id":"goodnight","name":"晚安","enabled":false,"match_type":"contains","keywords":["晚安"],"reply_mode":"random","replies":["晚安，{用户名}！","早点休息～"]},
-    {"__template_key":"regex","id":"regex_echo","name":"正则接话","enabled":false,"match_type":"regex","pattern":"^我(?P<动作>.+?)什么$","replies":["是啊{捕获.动作}什么"]}
+    {
+      "__template_key": "template",
+      "id": "echo",
+      "name": "限定词表接话",
+      "enabled": false,
+      "match_type": "template",
+      "pattern": "我{关键词}什么",
+      "capture_mode": "keywords",
+      "keywords": ["吃", "喝"],
+      "replies": ["是啊{关键词}什么"],
+      "allowed_group_ids": [],
+      "require_at": false
+    },
+    {
+      "__template_key": "keyword",
+      "id": "goodnight",
+      "name": "晚安",
+      "enabled": false,
+      "match_type": "contains",
+      "keywords": ["晚安"],
+      "replies": ["晚安，{用户名}！", "早点休息～"],
+      "allowed_group_ids": [],
+      "require_at": false
+    }
   ]
 }

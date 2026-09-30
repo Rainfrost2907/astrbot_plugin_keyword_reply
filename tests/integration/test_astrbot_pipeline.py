@@ -24,7 +24,7 @@ def plugin(snapshot, tmp_path):
 
 @pytest.mark.parametrize(
     "behavior,agent_calls",
-    [("success", 0), ("miss", 1), ("fail", 1), ("cooldown", 1), ("timeout", 1)],
+    [("success", 0), ("miss", 1), ("fail", 1), ("cooldown", 1), ("long", 1)],
 )
 async def test_real_process_stage_keeps_other_handlers(plugin, onebot_event, behavior, agent_calls):
     from astrbot.api.message_components import Plain
@@ -48,24 +48,8 @@ async def test_real_process_stage_keeps_other_handlers(plugin, onebot_event, beh
         onebot_event.message_obj.message = [Plain("无关键词")]
     if behavior == "fail":
         onebot_event.bot.fail = True
-    if behavior == "timeout":
-        from keyword_reply.engine import compile_snapshot
-
-        plugin.service.snapshot = compile_snapshot(
-            {
-                "rules": [
-                    {
-                        "id": "slow",
-                        "name": "slow",
-                        "match_type": "regex",
-                        "pattern": "(x+)+$",
-                        "replies": ["no"],
-                    }
-                ]
-            },
-            "timeout",
-        )
-        onebot_event.message_obj.message = [Plain("x" * 4095 + "!")]
+    if behavior == "long":
+        onebot_event.message_obj.message = [Plain("我" + "吃" * 4096 + "什么")]
     if behavior == "cooldown":
         await plugin.on_message(onebot_event)
         onebot_event.message_obj.message_id = "m2"

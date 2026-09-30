@@ -1,5 +1,7 @@
 # 验收记录
 
+以下证据针对1.0.0。2.0已按用户要求删减功能，其验证结果与部署边界见[acceptance-v2.md](acceptance-v2.md)。
+
 日期：2026-09-30。插件：astrbot_plugin_keyword_reply 1.0.0。Git分支：mian；作者及提交者：Rainfrost <luo005962@gmail.com>。
 
 ## 自动化与框架

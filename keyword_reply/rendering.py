@@ -27,9 +27,7 @@ def compile_replies(rule: Rule, capture_names: frozenset[str]) -> ReplyTemplates
                 if end < 0:
                     raise ValueError("回复模板花括号不闭合")
                 name = text[pos + 1 : end]
-                if name not in VARIABLES and not (
-                    name.startswith("捕获.") and name[3:] in capture_names
-                ):
+                if name not in VARIABLES:
                     raise ValueError(f"无效回复变量：{name}")
                 if literal:
                     tokens.append((False, literal))
@@ -60,7 +58,6 @@ def render_all(
         "规则ID": templates.rule_id,
         "规则名": templates.rule_name,
     }
-    values.update({f"捕获.{k}": v for k, v in match.groups.items()})
     rendered = tuple(
         "".join(values.get(text, "") if variable else text for variable, text in tokens)
         for tokens in templates.tokens

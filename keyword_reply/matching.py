@@ -1,16 +1,10 @@
+"""Literal keyword matching and bounded, full-message sentence capture."""
+
 from dataclasses import dataclass
-from string import ascii_lowercase, ascii_uppercase
 
 import regex
 
 from .models import Match, Rule
-from .regex_matching import compile_regex
-
-ASCII_FOLD = str.maketrans(ascii_uppercase, ascii_lowercase)
-
-
-def fold(text: str, ignore_case: bool) -> str:
-    return text.translate(ASCII_FOLD) if ignore_case else text
 
 
 def template_parts(pattern: str) -> tuple[str, str]:
@@ -37,90 +31,42 @@ def template_parts(pattern: str) -> tuple[str, str]:
 class CompiledMatcher:
     rule: Rule
     pattern: object | None
-    capture_names: frozenset[str]
+    capture_names: frozenset[str] = frozenset()
 
     def search(self, raw_text: str, *, timeout_s: float) -> Match | None:
-        rule = self.rule
-        original = raw_text.strip() if rule.trim else raw_text
-        if rule.ignore_trailing_question_marks:
-            original = original.rstrip("?？")
-        if not original:
+        text = raw_text.strip()
+        if not text:
             return None
-        text = fold(original, rule.ignore_case) if rule.match_type != "regex" else original
         if self.pattern is not None:
-            matches = (
-                (self.pattern.fullmatch(text, timeout=timeout_s),)
-                if rule.match_scope == "full"
-                else self.pattern.finditer(text, timeout=timeout_s, overlapped=True)
-            )
-            for found in matches:
-                if found is None:
-                    continue
-                start, end = found.span()
-                if start == end:
-                    continue
-                matched = original[start:end]
-                if rule.match_type == "template":
-                    a, b = found.span("kw")
-                    keyword = original[a:b]
-                    if (
-                        not keyword.strip()
-                        or not rule.capture_min <= len(keyword) <= rule.capture_max
-                    ):
-                        continue
-                    return Match(keyword, matched, {})
-                groups = {str(i): found.group(i) or "" for i in range(1, self.pattern.groups + 1)}
-                groups.update({k: v or "" for k, v in found.groupdict().items()})
-                return Match(matched, matched, groups)
-            return None
+            found = self.pattern.fullmatch(text, timeout=timeout_s)
+            if found is None or not found["kw"].strip():
+                return None
+            return Match(found["kw"], text, {})
         hits = []
-        for order, keyword in enumerate(rule.keywords):
-            word = fold(keyword, rule.ignore_case)
-            position = text.find(word)
-            if rule.match_type == "exact" and text != word:
-                continue
-            if rule.match_type == "prefix" and not text.startswith(word):
-                continue
-            if rule.match_type == "suffix":
-                if not text.endswith(word):
-                    continue
-                position = len(text) - len(word)
+        for order, keyword in enumerate(self.rule.keywords):
+            position = text.find(keyword)
             if position >= 0:
-                hits.append((position, -len(word), order, len(word)))
+                hits.append((position, -len(keyword), order, keyword))
         if not hits:
             return None
-        position, _, _, length = min(hits)
-        keyword = original[position : position + length]
+        keyword = min(hits)[-1]
         return Match(keyword, keyword, {})
 
 
 def compile_matcher(rule: Rule) -> CompiledMatcher:
-    if rule.match_type == "regex":
-        pattern = compile_regex(rule.pattern, rule.ignore_case)
-        names = frozenset(str(i) for i in range(1, pattern.groups + 1)) | frozenset(
-            pattern.groupindex
-        )
-        return CompiledMatcher(rule, pattern, names)
     if rule.match_type == "template":
         prefix, suffix = template_parts(rule.pattern)
         if rule.capture_mode == "keywords":
             words = sorted(rule.keywords, key=len, reverse=True)
             slot = "|".join(
-                regex.escape(fold(w, rule.ignore_case))
+                regex.escape(w)
                 for w in words
-                if "\n" not in w
-                and "\r" not in w
-                and rule.capture_min <= len(w) <= rule.capture_max
+                if "\n" not in w and "\r" not in w and 1 <= len(w) <= 128
             )
             if not slot:
-                raise ValueError("词表没有符合捕获长度与单行限制的词")
-            slot = f"(?P<kw>{slot})"
+                raise ValueError("限定词表须含1～128字符的单行词")
         else:
-            slot = rf"(?P<kw>[^\r\n]{{{rule.capture_min},{rule.capture_max}}}?)"
-        pattern = (
-            regex.escape(fold(prefix, rule.ignore_case))
-            + slot
-            + regex.escape(fold(suffix, rule.ignore_case))
-        )
-        return CompiledMatcher(rule, compile_regex(pattern), frozenset())
-    return CompiledMatcher(rule, None, frozenset())
+            slot = r"[^\r\n]{1,128}?"
+        expression = regex.escape(prefix) + f"(?P<kw>{slot})" + regex.escape(suffix)
+        return CompiledMatcher(rule, regex.compile(expression))
+    return CompiledMatcher(rule, None)

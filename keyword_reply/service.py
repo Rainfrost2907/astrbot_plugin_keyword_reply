@@ -8,26 +8,21 @@ from pathlib import Path
 
 from .engine import compile_snapshot, evaluate
 from .models import ConfigError, HandleResult, SendOutcome
-from .policy import RuntimePolicy, cursor_id, scope_id
+from .policy import RuntimePolicy, scope_id
 
 logger = logging.getLogger(__name__)
 REASONS = {
     "disabled": "面板或运行开关禁用",
-    "wrong_platform": "平台不符",
     "wrong_chat_type": "聊天类型不符",
-    "scope_denied": "群或用户范围不符",
+    "scope_denied": "不在适用群内",
     "needs_at": "需要直接 @机器人",
-    "excluded": "包含排除词",
     "no_match": "未匹配",
     "invalid_rule": "规则无效",
     "empty_reply": "回复为空或超长",
     "duplicate": "重复事件",
     "group_cooldown": "群冷却中",
-    "rule_cooldown": "群规则冷却中",
-    "user_cooldown": "用户规则冷却中",
-    "probability": "未通过概率抽样",
     "busy": "正在处理其他消息",
-    "regex_timeout": "正则超时",
+    "regex_timeout": "句式匹配超时",
     "budget_exhausted": "匹配预算耗尽",
     "send_failed": "发送失败",
     "matched": "已匹配",
@@ -172,13 +167,13 @@ class ReplyService:
         raw = json.loads(text)
         return await self.apply_config(raw, hashlib.sha256(text.encode()).hexdigest()[:16])
 
-    async def update_runtime(self, action, rule_id, scope, global_scope):
+    async def update_runtime(self, action, rule_id=None):
         if rule_id and rule_id not in {r.rule.id for r in self.snapshot.rules}:
             raise ValueError("规则不存在或配置无效")
         async with self._persist_lock:
             proposal = RuntimePolicy()
             proposal.restore_persistent(self.policy.export_persistent())
-            proposal.change_controls(action, rule_id, scope, global_scope)
+            proposal.change_controls(action, rule_id)
             data = proposal.export_persistent()
             await self.store.save(data)
             self.policy.apply_controls(data)
@@ -208,7 +203,7 @@ class ReplyService:
             return "匹配工作繁忙，请稍后测试（不会消耗冷却）。"
         lines = [
             "规则测试：只展示结果，不发送候选、不消耗冷却。",
-            f"选择模式：{snapshot.settings.selection_mode}",
+            "按列表顺序回复第一条可用规则，候选随机选一条。",
         ]
         lines.extend(
             f"{t.rule_id}: {REASONS.get(t.reason, t.reason)} {t.detail}" for t in evaluation.traces
@@ -217,16 +212,11 @@ class ReplyService:
         for candidate in evaluation.candidates:
             rule = candidate.rule
             lines.append(
-                f"{rule.id} 捕获={candidate.match.keyword!r} 匹配={candidate.match.text!r} 分组={candidate.match.groups!r}"
+                f"{rule.id} 捕获={candidate.match.keyword!r} 匹配={candidate.match.text!r}"
             )
             lines.append(f"候选：{candidate.replies!r}")
             trace = preview[rule.id]
             lines.append(f"门槛：{REASONS.get(trace.reason, trace.reason)}；{trace.detail}")
-            if rule.reply_mode == "round_robin":
-                index = self.policy._data["cursors"].get(
-                    cursor_id(message.scope, rule.id), 0
-                ) % len(candidate.replies)
-                lines.append(f"轮询下一项：{index + 1}")
         lines.extend(
             f"配置错误 {i.path}: {i.message}"
             for i in snapshot.issues
@@ -238,9 +228,7 @@ class ReplyService:
     def entry_reason(snapshot, message):
         if message.user_id == message.scope.bot_id:
             return "self_message"
-        if any(
-            message.text.lstrip().startswith(p) for p in snapshot.settings.ignore_command_prefixes
-        ):
+        if message.text.lstrip().startswith("/"):
             return "ignored_prefix"
         head = message.text.lstrip().split(maxsplit=1)
         if head and head[0] in {"kwr", "关键词回复"}:

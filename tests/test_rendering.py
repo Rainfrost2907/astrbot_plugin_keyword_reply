@@ -35,11 +35,14 @@ def test_invalid_placeholder_rejected(raw_rule, text):
         compile_replies(rule, frozenset())
 
 
-def test_optional_groups_and_empty_overlong_candidates(raw_rule, message):
-    raw_rule["replies"] = ["{捕获.1}", "ok", "{消息}{消息}"]
+def test_empty_and_overlong_candidates_filtered(raw_rule, message):
+    raw_rule["replies"] = ["{群ID}", "ok", "{消息}{消息}"]
     rule = load_config({"rules": [raw_rule]}).rules[0]
     result = render_all(
-        compile_replies(rule, frozenset({"1"})), Match("", "", {"1": ""}), message, max_chars=5
+        compile_replies(rule, frozenset()),
+        Match("", "", {}),
+        replace(message, scope=replace(message.scope, chat_type="private")),
+        max_chars=5,
     )
     assert result == ("ok",)
 

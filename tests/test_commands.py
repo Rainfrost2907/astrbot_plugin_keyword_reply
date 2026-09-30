@@ -20,17 +20,17 @@ def test_body_whitespace():
 
 
 @pytest.mark.parametrize(
-    "text,action,scope",
+    "text,action",
     [
-        ("关键词回复 help", "help", "here"),
-        ("kwr off echo global", "off", "global"),
-        ("kwr resume", "resume", "here"),
-        ("kwr testat all 我吃什么", "testat", "here"),
+        ("关键词回复 help", "help"),
+        ("kwr off echo", "off"),
+        ("kwr resume", "resume"),
+        ("kwr testat all 我吃什么", "testat"),
     ],
 )
-def test_commands(text, action, scope):
+def test_commands(text, action):
     command = parse_command(text)
-    assert (command.action, command.scope) == (action, scope)
+    assert command.action == action
 
 
 @pytest.mark.parametrize(
@@ -50,7 +50,7 @@ def test_invalid_parameters(text):
 
 
 async def test_nonadmin_cannot_view_or_mutate(command_service, message):
-    for text in ["kwr list", "kwr show echo", "kwr test all 我吃什么", "kwr pause global"]:
+    for text in ["kwr list", "kwr status", "kwr test all 我吃什么", "kwr pause"]:
         assert "仅 AstrBot" in await execute_command(
             command_service, parse_command(text), message, False
         )

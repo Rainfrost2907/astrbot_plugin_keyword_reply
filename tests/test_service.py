@@ -31,7 +31,7 @@ async def test_success_and_duplicate(service, message):
     assert sent == ["是啊吃什么"]
 
 
-async def test_send_failure_does_not_advance_cursor(service, message):
+async def test_send_failure_does_not_change_controls(service, message):
     before = service.policy.export_persistent()
 
     async def broken(text):
@@ -50,7 +50,7 @@ async def test_reload_preserves_snapshot_on_global_error(service):
 
 
 async def test_temporarily_invalid_rule_keeps_runtime_disable(service, message, raw_rule):
-    await service.update_runtime("off", "echo", message.scope, True)
+    await service.update_runtime("off", "echo")
     broken = dict(raw_rule, pattern="(", match_type="regex")
     await service.apply_config({"rules": [broken]}, "bad_rule")
     assert service.policy.export_persistent()["global_disabled"] == ["echo"]
@@ -80,17 +80,17 @@ async def test_management_save_failure_rolls_back(service, message, monkeypatch)
 
     monkeypatch.setattr(service.store, "save", fail)
     with pytest.raises(OSError):
-        await service.update_runtime("pause", None, message.scope, False)
+        await service.update_runtime("pause")
     assert service.policy.runtime_reason(message.scope) is None
 
 
-async def test_runtime_persists_and_here_does_not_pause_other_groups(service, message):
-    await service.update_runtime("pause", None, message.scope, False)
+async def test_runtime_pause_persists_and_applies_to_all_groups(service, message):
+    await service.update_runtime("pause")
     data = await service.store.load()
     fresh = RuntimePolicy()
     fresh.restore_persistent(data)
     assert fresh.runtime_reason(message.scope) == "disabled"
-    assert fresh.runtime_reason(replace(message.scope, target_id="other")) is None
+    assert fresh.runtime_reason(replace(message.scope, target_id="other")) == "disabled"
 
 
 async def test_busy_pool_does_not_queue(service, message):
@@ -118,34 +118,3 @@ async def test_cancellation_releases_reservation(service, message):
         await task
     assert not service.policy._active
     assert service.policy._dedup
-
-
-async def test_partial_success_and_reload_deletion(service, raw_rule, message):
-    await service.apply_config(
-        {"selection_mode": "all", "rules": [raw_rule, dict(raw_rule, id="other", replies=["bad"])]},
-        "r2",
-    )
-
-    async def send(text):
-        if text == "bad":
-            raise OSError("fail")
-
-    result = await service.handle(message, send)
-    assert result.sent_rule_ids == ("echo",)
-    await service.apply_config({"rules": []}, "r3")
-    assert service.snapshot.rules == ()
-
-
-async def test_round_robin_flushed_on_close(service, raw_rule, message):
-    await service.apply_config(
-        {"rules": [dict(raw_rule, replies=["a", "b"], reply_mode="round_robin")]}, "r2"
-    )
-
-    async def send(text):
-        pass
-
-    await service.handle(message, send)
-    await service.close()
-    await service.close()
-    state = await StateStore(service.store.path).load()
-    assert list(state["cursors"].values()) == [1]

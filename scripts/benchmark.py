@@ -41,23 +41,11 @@ async def main():
     ]
     ordinary = compile_snapshot({"rules": rules}, "bench")
     mixed_rules = rules[:400] + [
-        dict(r, match_type="regex", pattern="keyword[0-9]+") for r in rules[400:]
+        dict(r, match_type="template", pattern="hello{关键词}world") for r in rules[400:]
     ]
     mixed = compile_snapshot({"rules": mixed_rules}, "mixed")
-    timeout = compile_snapshot(
-        {
-            "rules": [
-                {
-                    "id": "slow",
-                    "name": "timeout",
-                    "match_type": "regex",
-                    "pattern": "(x+)+$",
-                    "replies": ["reply"],
-                }
-            ]
-        },
-        "slow",
-    )
+    if ordinary.issues or mixed.issues:
+        raise ValueError("性能测试规则配置无效")
     service = ReplyService(
         ordinary, RuntimePolicy(), StateStore(Path(".test_runs/benchmark/state.json"))
     )
@@ -72,16 +60,15 @@ async def main():
         "system": platform.platform(),
         "processor": platform.processor(),
         "ordinary_500_rules_4096_chars": measure(ordinary, message),
-        "mixed_400_literal_100_regex": measure(mixed, message),
-        "timeout_pattern": measure(timeout, replace(message, text="x" * 4095 + "!"), 100),
+        "mixed_400_keyword_100_sentence": measure(mixed, message),
         "concurrent_100": {
             reason: sum(r.reason == reason for r in counts) for reason in {r.reason for r in counts}
         },
         "remaining_permits": service._permits.qsize(),
     }
-    Path(".test_runs/benchmark.json").write_text(
-        json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    output = Path(".test_runs/benchmark.json")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps(report, ensure_ascii=False, indent=2))
 
 

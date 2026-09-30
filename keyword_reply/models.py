@@ -32,48 +32,19 @@ class Rule:
     name: str
     replies: tuple[str, ...]
     enabled: bool = True
-    priority: int = 0
     order: int = 0
     match_type: str = "contains"
     keywords: tuple[str, ...] = ()
     pattern: str = ""
-    match_scope: str = "full"
     capture_mode: str = "any"
-    capture_min: int = 1
-    capture_max: int = 128
-    ignore_case: bool = False
-    trim: bool = True
-    ignore_trailing_question_marks: bool = False
-    exclude_keywords: tuple[str, ...] = ()
-    chat_types: str = "group"
     require_at: bool = False
-    platform_ids: tuple[str, ...] = ()
     allowed_group_ids: tuple[str, ...] = ()
-    blocked_group_ids: tuple[str, ...] = ()
-    allowed_user_ids: tuple[str, ...] = ()
-    blocked_user_ids: tuple[str, ...] = ()
-    reply_mode: str = "random"
-    probability: float = 1.0
-    group_rule_cooldown_seconds: float = 0.0
-    user_rule_cooldown_seconds: float = 10.0
 
 
 @dataclass(frozen=True)
 class PluginConfig:
     enabled: bool = True
-    allow_private: bool = False
-    selection_mode: str = "priority"
-    max_replies: int = 3
     group_cooldown_seconds: float = 3.0
-    dedup_ttl_seconds: int = 120
-    max_input_chars: int = 4096
-    max_reply_chars: int = 2000
-    regex_timeout_ms: int = 10
-    evaluation_budget_ms: int = 100
-    max_rules: int = 500
-    ignore_command_prefixes: tuple[str, ...] = ("/",)
-    blocked_user_ids: tuple[str, ...] = ()
-    platform_ids: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -144,7 +115,6 @@ class Snapshot:
 class Delivery:
     rule_id: str
     text: str
-    next_cursor: int | None
 
 
 @dataclass(frozen=True)

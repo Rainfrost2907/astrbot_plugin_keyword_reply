@@ -39,7 +39,9 @@ class StateStore:
         except (ValueError, TypeError, KeyError):
             backup = self.path.with_name(f"{self.path.name}.corrupt-{time.time_ns()}")
             shutil.copy2(self.path, backup)
-            self.warning = "运行状态损坏，已保存备份并暂停自动回复；使用 /kwr resume global 恢复"
+            self.warning = (
+                "旧版或损坏的运行状态已备份，自动回复已暂停；核对规则后使用 /kwr resume 恢复"
+            )
             state = empty_state()
             state["global_paused"] = True
             return state

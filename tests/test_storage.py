@@ -51,3 +51,25 @@ async def test_temp_creation_failure_preserves_existing_state(tmp_path, monkeypa
     with pytest.raises(OSError):
         await store.save(dict(empty_state(), revision=1, global_paused=True))
     assert json.loads(store.path.read_text(encoding="utf-8"))["global_paused"] is False
+
+
+async def test_v1_state_preserved_before_reset_and_pause(tmp_path):
+    path = tmp_path / "state.json"
+    content = json.dumps(
+        {
+            "version": 1,
+            "revision": 7,
+            "global_paused": False,
+            "global_disabled": ["echo"],
+            "scopes": {},
+            "cursors": {},
+        }
+    )
+    path.write_text(content, encoding="utf-8")
+    store = StateStore(path)
+    state = await store.load()
+    assert state["version"] == 2 and state["global_paused"] is True
+    backup = next(tmp_path.glob("state.json.corrupt-*"))
+    assert backup.read_text(encoding="utf-8") == content
+    await store.save(state)
+    assert json.loads(path.read_text(encoding="utf-8"))["version"] == 2

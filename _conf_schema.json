@@ -1,663 +1,218 @@
 {
   "enabled": {
     "type": "bool",
-    "description": "基本：启用",
-    "default": true,
-    "hint": "面板关闭优先于聊天命令开启。"
-  },
-  "allow_private": {
-    "type": "bool",
-    "description": "基本：允许私聊",
-    "default": false
-  },
-  "selection_mode": {
-    "type": "string",
-    "description": "回复：多规则选择方式",
-    "default": "priority",
-    "hint": "priority：优先级高者一条，同级按列表顺序；random：符合条件的规则均匀选一条；all：按顺序发送，受上限限制。",
-    "options": [
-      "all",
-      "priority",
-      "random"
-    ]
-  },
-  "max_replies": {
-    "type": "int",
-    "description": "回复：多条模式上限",
-    "default": 3
+    "description": "启用插件",
+    "default": true
   },
   "group_cooldown_seconds": {
     "type": "float",
-    "description": "限制：会话总冷却秒数",
-    "default": 3.0,
-    "hint": "0秒表示关闭该冷却。仅成功发送后计时；私聊按独立会话计算。"
-  },
-  "dedup_ttl_seconds": {
-    "type": "int",
-    "description": "限制：消息ID去重秒数",
-    "default": 120
-  },
-  "max_input_chars": {
-    "type": "int",
-    "description": "限制：最大输入字符",
-    "default": 4096
-  },
-  "max_reply_chars": {
-    "type": "int",
-    "description": "限制：最大回复字符",
-    "default": 2000
-  },
-  "regex_timeout_ms": {
-    "type": "int",
-    "description": "限制：单次正则超时毫秒",
-    "default": 10,
-    "hint": "正则实际执行超时后跳过该规则，避免阻塞消息处理。"
-  },
-  "evaluation_budget_ms": {
-    "type": "int",
-    "description": "限制：总评估预算毫秒",
-    "default": 100,
-    "hint": "总匹配预算耗尽时整条消息不自动回复。"
-  },
-  "max_rules": {
-    "type": "int",
-    "description": "限制：规则数量上限",
-    "default": 500,
-    "hint": "首版固定500，超过500条拒绝整个新配置。"
-  },
-  "ignore_command_prefixes": {
-    "type": "list",
-    "description": "范围：忽略的命令前缀",
-    "default": [
-      "/"
-    ],
-    "hint": "正文去掉左侧空白后，以任一前缀开头即不自动回复。默认忽略/；管理命令仍可用。"
-  },
-  "blocked_user_ids": {
-    "type": "list",
-    "description": "范围：用户黑名单",
-    "default": [],
-    "hint": "QQ号/群号填写字符串。空列表表示不限制；黑名单优先于白名单。群限制不作用于私聊。"
-  },
-  "platform_ids": {
-    "type": "list",
-    "description": "范围：平台实例ID",
-    "default": [],
-    "hint": "填写AstrBot平台实例ID，空列表不限。不是适配器名称。"
+    "description": "群聊回复间隔（秒）",
+    "hint": "默认3秒，0表示不限。仅成功回复后开始计时。",
+    "default": 3.0
   },
   "rules": {
     "type": "template_list",
     "description": "回复规则",
-    "hint": "最多500条。新增默认禁用，填完再开启；同级按列表顺序。",
+    "hint": "新增关键词或句式规则。按列表顺序，第一条命中后只回复一次。填完再启用。",
     "default": [],
     "templates": {
       "keyword": {
-        "name": "关键词",
+        "name": "关键词回复",
         "display_item": "name",
-        "hint": "填写唯一ID、名称及回复候选后启用；高级选项可保留默认。",
+        "hint": "消息包含关键词时回复。",
         "items": {
           "id": {
             "type": "string",
-            "description": "基本：唯一规则ID",
+            "description": "规则ID",
             "default": "",
-            "hint": "填写1～64位英文字母、数字、下划线或短横线，全部规则中唯一。修改ID视为新规则。"
+            "hint": "例如 echo、goodnight；英文、数字、下划线或短横线，不能重复。用于聊天指令。"
           },
           "name": {
             "type": "string",
-            "description": "基本：规则名称",
+            "description": "名称",
             "default": ""
-          },
-          "replies": {
-            "type": "list",
-            "description": "回复：文字候选列表",
-            "default": [],
-            "hint": "每项一条候选，可含换行；变量：{关键词}、{匹配文本}、{消息}、{用户名}、{用户ID}、{群ID}、{规则ID}、{规则名}、{捕获.动作}或{捕获.1}。{{和}}表示字面花括号。"
           },
           "enabled": {
             "type": "bool",
-            "description": "基本：启用",
-            "default": false,
-            "hint": "面板关闭优先于聊天命令开启。"
-          },
-          "priority": {
-            "type": "int",
-            "description": "基本：优先级",
-            "default": 0
-          },
-          "match_type": {
-            "type": "string",
-            "description": "匹配：匹配方式",
-            "default": "contains",
-            "hint": "contains包含、exact全句相等、prefix开头、suffix结尾、template句式捕获、regex正则。关键词为OR关系。",
-            "options": [
-              "contains",
-              "exact",
-              "prefix",
-              "regex",
-              "suffix",
-              "template"
-            ]
+            "description": "启用",
+            "default": false
           },
           "keywords": {
             "type": "list",
-            "description": "匹配：关键词列表",
+            "description": "关键词",
             "default": [],
-            "hint": "普通匹配填写一个或多个关键词；句式的keywords捕获模式仅允许这些词。any模式不需要词表。"
+            "hint": "每项一个词，命中任意一个即可。"
           },
-          "pattern": {
-            "type": "text",
-            "description": "匹配：句式或正则",
-            "default": "",
-            "hint": "句式示例：我{关键词}什么，恰好一个占位符；正则示例：^我(?P<动作>.+?)什么$。"
-          },
-          "match_scope": {
-            "type": "string",
-            "description": "匹配：全句或搜索",
-            "default": "full",
-            "hint": "full：整段正文必须匹配；search：正文任意位置匹配。仅作用于句式和正则。",
-            "options": [
-              "full",
-              "search"
-            ]
-          },
-          "capture_mode": {
-            "type": "string",
-            "description": "匹配：捕获模式",
-            "default": "any",
-            "hint": "any：捕获任意非空、非跨行内容；keywords：仅捕获词表中的内容。",
-            "options": [
-              "any",
-              "keywords"
-            ]
-          },
-          "capture_min": {
-            "type": "int",
-            "description": "匹配：最少捕获字符",
-            "default": 1
-          },
-          "capture_max": {
-            "type": "int",
-            "description": "匹配：最多捕获字符",
-            "default": 128
-          },
-          "ignore_case": {
-            "type": "bool",
-            "description": "匹配：忽略ASCII大小写",
-            "default": false,
-            "hint": "普通词/句式仅折叠ASCII英文大小写，保持捕获原文。正则同时开启ASCII标志，\\w、\\d等也使用ASCII语义。"
-          },
-          "trim": {
-            "type": "bool",
-            "description": "匹配：去掉正文首尾空白",
-            "default": true
-          },
-          "ignore_trailing_question_marks": {
-            "type": "bool",
-            "description": "匹配：忽略末尾问号",
-            "default": false,
-            "hint": "去掉正文末尾连续的?和？，然后匹配；其他标点不处理。"
-          },
-          "exclude_keywords": {
+          "replies": {
             "type": "list",
-            "description": "匹配：排除词",
+            "description": "回复",
             "default": [],
-            "hint": "任一排除词出现在处理后的正文中即跳过本规则。"
-          },
-          "chat_types": {
-            "type": "string",
-            "description": "范围：聊天类型",
-            "default": "group",
-            "options": [
-              "both",
-              "group",
-              "private"
-            ]
-          },
-          "require_at": {
-            "type": "bool",
-            "description": "范围：群聊必须直接@机器人",
-            "default": false,
-            "hint": "仅顶层直接@本机器人满足；引用、@全体成员不算。私聊不要求@。"
-          },
-          "platform_ids": {
-            "type": "list",
-            "description": "范围：平台实例ID",
-            "default": [],
-            "hint": "填写AstrBot平台实例ID，空列表不限。不是适配器名称。"
+            "hint": "一项就是一条回复，多项时随机选一条。支持 {关键词}、{用户名} 等文字变量。"
           },
           "allowed_group_ids": {
             "type": "list",
-            "description": "范围：群白名单",
+            "description": "适用群",
             "default": [],
-            "hint": "QQ号/群号填写字符串。空列表表示不限制；黑名单优先于白名单。群限制不作用于私聊。"
+            "hint": "每项一个群号；留空适用全部群。"
           },
-          "blocked_group_ids": {
-            "type": "list",
-            "description": "范围：群黑名单",
-            "default": [],
-            "hint": "QQ号/群号填写字符串。空列表表示不限制；黑名单优先于白名单。群限制不作用于私聊。"
+          "require_at": {
+            "type": "bool",
+            "description": "需要@机器人",
+            "default": false,
+            "hint": "开启后必须直接@机器人；引用和@全体不算。"
           },
-          "allowed_user_ids": {
-            "type": "list",
-            "description": "范围：用户白名单",
-            "default": [],
-            "hint": "QQ号/群号填写字符串。空列表表示不限制；黑名单优先于白名单。群限制不作用于私聊。"
-          },
-          "blocked_user_ids": {
-            "type": "list",
-            "description": "范围：用户黑名单",
-            "default": [],
-            "hint": "QQ号/群号填写字符串。空列表表示不限制；黑名单优先于白名单。群限制不作用于私聊。"
-          },
-          "reply_mode": {
+          "match_type": {
             "type": "string",
-            "description": "回复：候选选择方式",
-            "default": "random",
-            "hint": "first第一条；random均匀随机一条；round_robin按会话轮询，仅发送成功后推进。",
-            "options": [
-              "first",
-              "random",
-              "round_robin"
-            ]
-          },
-          "probability": {
-            "type": "float",
-            "description": "限制：触发概率",
-            "default": 1.0,
-            "hint": "0～1：0永不触发，1必定参与选择；每个候选规则只抽样一次。test不抽样。"
-          },
-          "group_rule_cooldown_seconds": {
-            "type": "float",
-            "description": "限制：会话内本规则冷却秒数",
-            "default": 0.0,
-            "hint": "0秒表示关闭该冷却。仅成功发送后计时；私聊按独立会话计算。"
-          },
-          "user_rule_cooldown_seconds": {
-            "type": "float",
-            "description": "限制：会话内用户本规则冷却秒数",
-            "default": 10.0,
-            "hint": "0秒表示关闭该冷却。仅成功发送后计时；私聊按独立会话计算。"
+            "description": "规则类型",
+            "default": "contains",
+            "invisible": true
           }
         }
       },
       "template": {
-        "name": "句式",
+        "name": "句式接话",
         "display_item": "name",
-        "hint": "填写唯一ID、名称及回复候选后启用；高级选项可保留默认。",
+        "hint": "例如：我吃什么 → 是啊吃什么。",
         "items": {
           "id": {
             "type": "string",
-            "description": "基本：唯一规则ID",
+            "description": "规则ID",
             "default": "",
-            "hint": "填写1～64位英文字母、数字、下划线或短横线，全部规则中唯一。修改ID视为新规则。"
+            "hint": "例如 echo、goodnight；英文、数字、下划线或短横线，不能重复。用于聊天指令。"
           },
           "name": {
             "type": "string",
-            "description": "基本：规则名称",
+            "description": "名称",
             "default": ""
-          },
-          "replies": {
-            "type": "list",
-            "description": "回复：文字候选列表",
-            "default": [],
-            "hint": "每项一条候选，可含换行；变量：{关键词}、{匹配文本}、{消息}、{用户名}、{用户ID}、{群ID}、{规则ID}、{规则名}、{捕获.动作}或{捕获.1}。{{和}}表示字面花括号。"
           },
           "enabled": {
             "type": "bool",
-            "description": "基本：启用",
-            "default": false,
-            "hint": "面板关闭优先于聊天命令开启。"
-          },
-          "priority": {
-            "type": "int",
-            "description": "基本：优先级",
-            "default": 0
-          },
-          "match_type": {
-            "type": "string",
-            "description": "匹配：匹配方式",
-            "default": "template",
-            "hint": "contains包含、exact全句相等、prefix开头、suffix结尾、template句式捕获、regex正则。关键词为OR关系。",
-            "options": [
-              "contains",
-              "exact",
-              "prefix",
-              "regex",
-              "suffix",
-              "template"
-            ]
-          },
-          "keywords": {
-            "type": "list",
-            "description": "匹配：关键词列表",
-            "default": [],
-            "hint": "普通匹配填写一个或多个关键词；句式的keywords捕获模式仅允许这些词。any模式不需要词表。"
+            "description": "启用",
+            "default": false
           },
           "pattern": {
             "type": "text",
-            "description": "匹配：句式或正则",
+            "description": "句式",
             "default": "我{关键词}什么",
-            "hint": "句式示例：我{关键词}什么，恰好一个占位符；正则示例：^我(?P<动作>.+?)什么$。"
-          },
-          "match_scope": {
-            "type": "string",
-            "description": "匹配：全句或搜索",
-            "default": "full",
-            "hint": "full：整段正文必须匹配；search：正文任意位置匹配。仅作用于句式和正则。",
-            "options": [
-              "full",
-              "search"
-            ]
+            "hint": "例如：我{关键词}什么。整条消息匹配，首尾空白自动去掉。"
           },
           "capture_mode": {
             "type": "string",
-            "description": "匹配：捕获模式",
+            "description": "捕获内容",
             "default": "any",
-            "hint": "any：捕获任意非空、非跨行内容；keywords：仅捕获词表中的内容。",
+            "hint": "any：任意内容；keywords：仅限关键词列表。",
             "options": [
               "any",
               "keywords"
-            ]
-          },
-          "capture_min": {
-            "type": "int",
-            "description": "匹配：最少捕获字符",
-            "default": 1
-          },
-          "capture_max": {
-            "type": "int",
-            "description": "匹配：最多捕获字符",
-            "default": 128
-          },
-          "ignore_case": {
-            "type": "bool",
-            "description": "匹配：忽略ASCII大小写",
-            "default": false,
-            "hint": "普通词/句式仅折叠ASCII英文大小写，保持捕获原文。正则同时开启ASCII标志，\\w、\\d等也使用ASCII语义。"
-          },
-          "trim": {
-            "type": "bool",
-            "description": "匹配：去掉正文首尾空白",
-            "default": true
-          },
-          "ignore_trailing_question_marks": {
-            "type": "bool",
-            "description": "匹配：忽略末尾问号",
-            "default": false,
-            "hint": "去掉正文末尾连续的?和？，然后匹配；其他标点不处理。"
-          },
-          "exclude_keywords": {
-            "type": "list",
-            "description": "匹配：排除词",
-            "default": [],
-            "hint": "任一排除词出现在处理后的正文中即跳过本规则。"
-          },
-          "chat_types": {
-            "type": "string",
-            "description": "范围：聊天类型",
-            "default": "group",
-            "options": [
-              "both",
-              "group",
-              "private"
-            ]
-          },
-          "require_at": {
-            "type": "bool",
-            "description": "范围：群聊必须直接@机器人",
-            "default": false,
-            "hint": "仅顶层直接@本机器人满足；引用、@全体成员不算。私聊不要求@。"
-          },
-          "platform_ids": {
-            "type": "list",
-            "description": "范围：平台实例ID",
-            "default": [],
-            "hint": "填写AstrBot平台实例ID，空列表不限。不是适配器名称。"
-          },
-          "allowed_group_ids": {
-            "type": "list",
-            "description": "范围：群白名单",
-            "default": [],
-            "hint": "QQ号/群号填写字符串。空列表表示不限制；黑名单优先于白名单。群限制不作用于私聊。"
-          },
-          "blocked_group_ids": {
-            "type": "list",
-            "description": "范围：群黑名单",
-            "default": [],
-            "hint": "QQ号/群号填写字符串。空列表表示不限制；黑名单优先于白名单。群限制不作用于私聊。"
-          },
-          "allowed_user_ids": {
-            "type": "list",
-            "description": "范围：用户白名单",
-            "default": [],
-            "hint": "QQ号/群号填写字符串。空列表表示不限制；黑名单优先于白名单。群限制不作用于私聊。"
-          },
-          "blocked_user_ids": {
-            "type": "list",
-            "description": "范围：用户黑名单",
-            "default": [],
-            "hint": "QQ号/群号填写字符串。空列表表示不限制；黑名单优先于白名单。群限制不作用于私聊。"
-          },
-          "reply_mode": {
-            "type": "string",
-            "description": "回复：候选选择方式",
-            "default": "random",
-            "hint": "first第一条；random均匀随机一条；round_robin按会话轮询，仅发送成功后推进。",
-            "options": [
-              "first",
-              "random",
-              "round_robin"
-            ]
-          },
-          "probability": {
-            "type": "float",
-            "description": "限制：触发概率",
-            "default": 1.0,
-            "hint": "0～1：0永不触发，1必定参与选择；每个候选规则只抽样一次。test不抽样。"
-          },
-          "group_rule_cooldown_seconds": {
-            "type": "float",
-            "description": "限制：会话内本规则冷却秒数",
-            "default": 0.0,
-            "hint": "0秒表示关闭该冷却。仅成功发送后计时；私聊按独立会话计算。"
-          },
-          "user_rule_cooldown_seconds": {
-            "type": "float",
-            "description": "限制：会话内用户本规则冷却秒数",
-            "default": 10.0,
-            "hint": "0秒表示关闭该冷却。仅成功发送后计时；私聊按独立会话计算。"
-          }
-        }
-      },
-      "regex": {
-        "name": "正则",
-        "display_item": "name",
-        "hint": "填写唯一ID、名称及回复候选后启用；高级选项可保留默认。",
-        "items": {
-          "id": {
-            "type": "string",
-            "description": "基本：唯一规则ID",
-            "default": "",
-            "hint": "填写1～64位英文字母、数字、下划线或短横线，全部规则中唯一。修改ID视为新规则。"
-          },
-          "name": {
-            "type": "string",
-            "description": "基本：规则名称",
-            "default": ""
-          },
-          "replies": {
-            "type": "list",
-            "description": "回复：文字候选列表",
-            "default": [],
-            "hint": "每项一条候选，可含换行；变量：{关键词}、{匹配文本}、{消息}、{用户名}、{用户ID}、{群ID}、{规则ID}、{规则名}、{捕获.动作}或{捕获.1}。{{和}}表示字面花括号。"
-          },
-          "enabled": {
-            "type": "bool",
-            "description": "基本：启用",
-            "default": false,
-            "hint": "面板关闭优先于聊天命令开启。"
-          },
-          "priority": {
-            "type": "int",
-            "description": "基本：优先级",
-            "default": 0
-          },
-          "match_type": {
-            "type": "string",
-            "description": "匹配：匹配方式",
-            "default": "regex",
-            "hint": "contains包含、exact全句相等、prefix开头、suffix结尾、template句式捕获、regex正则。关键词为OR关系。",
-            "options": [
-              "contains",
-              "exact",
-              "prefix",
-              "regex",
-              "suffix",
-              "template"
             ]
           },
           "keywords": {
             "type": "list",
-            "description": "匹配：关键词列表",
+            "description": "关键词",
             "default": [],
-            "hint": "普通匹配填写一个或多个关键词；句式的keywords捕获模式仅允许这些词。any模式不需要词表。"
+            "hint": "每项一个词，命中任意一个即可。",
+            "condition": {
+              "capture_mode": "keywords"
+            }
           },
-          "pattern": {
-            "type": "text",
-            "description": "匹配：句式或正则",
-            "default": "",
-            "hint": "句式示例：我{关键词}什么，恰好一个占位符；正则示例：^我(?P<动作>.+?)什么$。"
-          },
-          "match_scope": {
-            "type": "string",
-            "description": "匹配：全句或搜索",
-            "default": "full",
-            "hint": "full：整段正文必须匹配；search：正文任意位置匹配。仅作用于句式和正则。",
-            "options": [
-              "full",
-              "search"
-            ]
-          },
-          "capture_mode": {
-            "type": "string",
-            "description": "匹配：捕获模式",
-            "default": "any",
-            "hint": "any：捕获任意非空、非跨行内容；keywords：仅捕获词表中的内容。",
-            "options": [
-              "any",
-              "keywords"
-            ]
-          },
-          "capture_min": {
-            "type": "int",
-            "description": "匹配：最少捕获字符",
-            "default": 1
-          },
-          "capture_max": {
-            "type": "int",
-            "description": "匹配：最多捕获字符",
-            "default": 128
-          },
-          "ignore_case": {
-            "type": "bool",
-            "description": "匹配：忽略ASCII大小写",
-            "default": false,
-            "hint": "普通词/句式仅折叠ASCII英文大小写，保持捕获原文。正则同时开启ASCII标志，\\w、\\d等也使用ASCII语义。"
-          },
-          "trim": {
-            "type": "bool",
-            "description": "匹配：去掉正文首尾空白",
-            "default": true
-          },
-          "ignore_trailing_question_marks": {
-            "type": "bool",
-            "description": "匹配：忽略末尾问号",
-            "default": false,
-            "hint": "去掉正文末尾连续的?和？，然后匹配；其他标点不处理。"
-          },
-          "exclude_keywords": {
+          "replies": {
             "type": "list",
-            "description": "匹配：排除词",
+            "description": "回复",
             "default": [],
-            "hint": "任一排除词出现在处理后的正文中即跳过本规则。"
-          },
-          "chat_types": {
-            "type": "string",
-            "description": "范围：聊天类型",
-            "default": "group",
-            "options": [
-              "both",
-              "group",
-              "private"
-            ]
-          },
-          "require_at": {
-            "type": "bool",
-            "description": "范围：群聊必须直接@机器人",
-            "default": false,
-            "hint": "仅顶层直接@本机器人满足；引用、@全体成员不算。私聊不要求@。"
-          },
-          "platform_ids": {
-            "type": "list",
-            "description": "范围：平台实例ID",
-            "default": [],
-            "hint": "填写AstrBot平台实例ID，空列表不限。不是适配器名称。"
+            "hint": "一项就是一条回复，多项时随机选一条。支持 {关键词}、{用户名} 等文字变量。"
           },
           "allowed_group_ids": {
             "type": "list",
-            "description": "范围：群白名单",
+            "description": "适用群",
             "default": [],
-            "hint": "QQ号/群号填写字符串。空列表表示不限制；黑名单优先于白名单。群限制不作用于私聊。"
+            "hint": "每项一个群号；留空适用全部群。"
           },
-          "blocked_group_ids": {
-            "type": "list",
-            "description": "范围：群黑名单",
-            "default": [],
-            "hint": "QQ号/群号填写字符串。空列表表示不限制；黑名单优先于白名单。群限制不作用于私聊。"
+          "require_at": {
+            "type": "bool",
+            "description": "需要@机器人",
+            "default": false,
+            "hint": "开启后必须直接@机器人；引用和@全体不算。"
           },
-          "allowed_user_ids": {
-            "type": "list",
-            "description": "范围：用户白名单",
-            "default": [],
-            "hint": "QQ号/群号填写字符串。空列表表示不限制；黑名单优先于白名单。群限制不作用于私聊。"
-          },
-          "blocked_user_ids": {
-            "type": "list",
-            "description": "范围：用户黑名单",
-            "default": [],
-            "hint": "QQ号/群号填写字符串。空列表表示不限制；黑名单优先于白名单。群限制不作用于私聊。"
-          },
-          "reply_mode": {
+          "match_type": {
             "type": "string",
-            "description": "回复：候选选择方式",
-            "default": "random",
-            "hint": "first第一条；random均匀随机一条；round_robin按会话轮询，仅发送成功后推进。",
-            "options": [
-              "first",
-              "random",
-              "round_robin"
-            ]
-          },
-          "probability": {
-            "type": "float",
-            "description": "限制：触发概率",
-            "default": 1.0,
-            "hint": "0～1：0永不触发，1必定参与选择；每个候选规则只抽样一次。test不抽样。"
-          },
-          "group_rule_cooldown_seconds": {
-            "type": "float",
-            "description": "限制：会话内本规则冷却秒数",
-            "default": 0.0,
-            "hint": "0秒表示关闭该冷却。仅成功发送后计时；私聊按独立会话计算。"
-          },
-          "user_rule_cooldown_seconds": {
-            "type": "float",
-            "description": "限制：会话内用户本规则冷却秒数",
-            "default": 10.0,
-            "hint": "0秒表示关闭该冷却。仅成功发送后计时；私聊按独立会话计算。"
+            "description": "规则类型",
+            "default": "template",
+            "invisible": true
           }
         }
       }
     }
+  },
+  "allow_private": {
+    "type": "string",
+    "description": "旧版升级检查",
+    "default": "__retired_in_v2__",
+    "invisible": true
+  },
+  "blocked_user_ids": {
+    "type": "string",
+    "description": "旧版升级检查",
+    "default": "__retired_in_v2__",
+    "invisible": true
+  },
+  "dedup_ttl_seconds": {
+    "type": "string",
+    "description": "旧版升级检查",
+    "default": "__retired_in_v2__",
+    "invisible": true
+  },
+  "evaluation_budget_ms": {
+    "type": "string",
+    "description": "旧版升级检查",
+    "default": "__retired_in_v2__",
+    "invisible": true
+  },
+  "ignore_command_prefixes": {
+    "type": "string",
+    "description": "旧版升级检查",
+    "default": "__retired_in_v2__",
+    "invisible": true
+  },
+  "max_input_chars": {
+    "type": "string",
+    "description": "旧版升级检查",
+    "default": "__retired_in_v2__",
+    "invisible": true
+  },
+  "max_replies": {
+    "type": "string",
+    "description": "旧版升级检查",
+    "default": "__retired_in_v2__",
+    "invisible": true
+  },
+  "max_reply_chars": {
+    "type": "string",
+    "description": "旧版升级检查",
+    "default": "__retired_in_v2__",
+    "invisible": true
+  },
+  "max_rules": {
+    "type": "string",
+    "description": "旧版升级检查",
+    "default": "__retired_in_v2__",
+    "invisible": true
+  },
+  "platform_ids": {
+    "type": "string",
+    "description": "旧版升级检查",
+    "default": "__retired_in_v2__",
+    "invisible": true
+  },
+  "regex_timeout_ms": {
+    "type": "string",
+    "description": "旧版升级检查",
+    "default": "__retired_in_v2__",
+    "invisible": true
+  },
+  "selection_mode": {
+    "type": "string",
+    "description": "旧版升级检查",
+    "default": "__retired_in_v2__",
+    "invisible": true
   }
 }
