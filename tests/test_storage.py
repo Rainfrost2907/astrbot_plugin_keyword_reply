@@ -38,3 +38,16 @@ async def test_replace_failure_keeps_old_file(tmp_path, monkeypatch):
         await store.save(dict(state, revision=1, global_paused=True))
     assert json.loads(store.path.read_text(encoding="utf-8"))["global_paused"] is False
     assert not list(tmp_path.glob("*.tmp"))
+
+
+async def test_temp_creation_failure_preserves_existing_state(tmp_path, monkeypatch):
+    store = StateStore(tmp_path / "state.json")
+    await store.save(empty_state())
+
+    def fail(*args, **kwargs):
+        raise OSError("no space")
+
+    monkeypatch.setattr("keyword_reply.storage.tempfile.mkstemp", fail)
+    with pytest.raises(OSError):
+        await store.save(dict(empty_state(), revision=1, global_paused=True))
+    assert json.loads(store.path.read_text(encoding="utf-8"))["global_paused"] is False

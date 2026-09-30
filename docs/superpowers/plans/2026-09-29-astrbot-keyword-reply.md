@@ -120,15 +120,21 @@ astrbot_plugin_keyword_reply/
 
 **Interfaces:** `load_config(raw: dict) -> LoadedConfig`；全局错误抛 `ConfigError`，单条规则错误写入 issues 且不进入 rules。为后续任务提供上述数据类型。
 
-- [ ] 创建 Python 3.12 虚拟环境，在 pyproject.toml 定义 pytest、pytest-asyncio、Ruff 开发依赖，并在 requirements.txt 写入 `regex>=2024.11.6,<2027`。不把 AstrBot 当插件运行依赖重复安装，真实框架在集成阶段单独提供。
-- [ ] 创建基础 fixture 和以下失败测试。`raw_rule` 仅提供必填值，其余字段由 load_config 生成设计说明中的默认值。
+- [x] 创建 Python 3.12 虚拟环境，在 pyproject.toml 定义 pytest、pytest-asyncio、Ruff 开发依赖，并在 requirements.txt 写入 `regex>=2024.11.6,<2027`。不把 AstrBot 当插件运行依赖重复安装，真实框架在集成阶段单独提供。
+- [x] 创建基础 fixture 和以下失败测试。`raw_rule` 仅提供必填值，其余字段由 load_config 生成设计说明中的默认值。
 
 ```python
 @pytest.fixture
 def raw_rule():
-    return {"id": "echo", "name": "句式回复", "match_type": "template",
-            "pattern": "我{关键词}什么", "capture_mode": "any",
-            "replies": ["是啊{关键词}什么"]}
+    return {
+        "id": "echo",
+        "name": "句式回复",
+        "match_type": "template",
+        "pattern": "我{关键词}什么",
+        "capture_mode": "any",
+        "replies": ["是啊{关键词}什么"],
+    }
+
 
 def test_defaults(raw_rule):
     loaded = load_config({"rules": [raw_rule]})
@@ -136,9 +142,11 @@ def test_defaults(raw_rule):
     assert loaded.rules[0].user_rule_cooldown_seconds == 10.0
     assert loaded.rules[0].match_scope == "full"
 
+
 def test_duplicate_id_rejects_entire_snapshot(raw_rule):
     with pytest.raises(ConfigError):
         load_config({"rules": [raw_rule, dict(raw_rule)]})
+
 
 def test_bad_rule_is_isolated(raw_rule):
     bad = dict(raw_rule, id="bad", probability=2)
@@ -147,9 +155,9 @@ def test_bad_rule_is_isolated(raw_rule):
     assert result.issues[0].path == "rules[1].probability"
 ```
 
-- [ ] 运行 `python -m pytest tests/test_config.py -q`，确认未实现入口导致失败；不要把环境缺失当作需求测试失败。
-- [ ] 按设计说明 4.1/4.2 逐字段解析。禁止 `bool("false")`、静默把 float 转 ID、接受 NaN 概率；未知业务字段记录错误，允许表单元字段 `__template_key`。
-- [ ] 按以下顺序实现，保证错误路径可定位：
+- [x] 运行 `python -m pytest tests/test_config.py -q`，确认未实现入口导致失败；不要把环境缺失当作需求测试失败。
+- [x] 按设计说明 4.1/4.2 逐字段解析。禁止 `bool("false")`、静默把 float 转 ID、接受 NaN 概率；未知业务字段记录错误，允许表单元字段 `__template_key`。
+- [x] 按以下顺序实现，保证错误路径可定位：
 
 ```text
 验证顶层对象 → 补全全局默认值 → 验证类型/数值边界
@@ -157,8 +165,8 @@ def test_bad_rule_is_isolated(raw_rule):
 → 对单条错误生成 ConfigIssue → 冻结成功模型
 ```
 
-- [ ] 增加空词表、空回复、布尔值冒充整数、超过规则数、非法 ID、私聊枚举和禁用但配置无效的用例，重新运行该测试文件。
-- [ ] 通过后提交 `feat: define keyword reply configuration and validation`。
+- [x] 增加空词表、空回复、布尔值冒充整数、超过规则数、非法 ID、私聊枚举和禁用但配置无效的用例，重新运行该测试文件。
+- [x] 通过后提交 `feat: define keyword reply configuration and validation`。
 
 ## Task 2：六种匹配模式与有界正则
 
@@ -166,23 +174,29 @@ def test_bad_rule_is_isolated(raw_rule):
 
 **Interfaces:** `compile_matcher(rule: Rule) -> CompiledMatcher`；matcher 暴露 `capture_names: frozenset[str]` 和 `search(raw_text: str, *, timeout_s: float) -> Match | None`。超时抛内置 `TimeoutError`，编译失败转 `ConfigIssue` 由 Task 4 汇总。
 
-- [ ] 为下列输入矩阵建立参数化测试，模板通过 Task 1 fixture 和 load_config 创建。
+- [x] 为下列输入矩阵建立参数化测试，模板通过 Task 1 fixture 和 load_config 创建。
 
 ```python
-@pytest.mark.parametrize(("text", "expected"), [
-    ("我吃什么", "吃"), ("我学习什么", "学习"),
-    ("我什么", None), ("我   什么", None),
-    ("今天我吃什么", None), ("我吃什么？", None),
-])
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("我吃什么", "吃"),
+        ("我学习什么", "学习"),
+        ("我什么", None),
+        ("我   什么", None),
+        ("今天我吃什么", None),
+        ("我吃什么？", None),
+    ],
+)
 def test_template_full_match(raw_rule, text, expected):
     rule = load_config({"rules": [raw_rule]}).rules[0]
     found = compile_matcher(rule).search(text, timeout_s=0.01)
     assert (found.keyword if found else None) == expected
 ```
 
-- [ ] 运行 `python -m pytest tests/test_matching.py tests/test_regex.py -q`，确认具体行为尚未实现而失败。
-- [ ] 普通匹配按「最靠左 → 最长 → 配置顺序」选择关键词；精确模式匹配整个正文，前/后缀分别固定一端。
-- [ ] 实现模板 token 解析、字面转义和一个槽位约束。内部组名固定为 `kw`，显示槽位仍为中文。示意编译规则如下，不允许直接把用户句式当正则：
+- [x] 运行 `python -m pytest tests/test_matching.py tests/test_regex.py -q`，确认具体行为尚未实现而失败。
+- [x] 普通匹配按「最靠左 → 最长 → 配置顺序」选择关键词；精确模式匹配整个正文，前/后缀分别固定一端。
+- [x] 实现模板 token 解析、字面转义和一个槽位约束。内部组名固定为 `kw`，显示槽位仍为中文。示意编译规则如下，不允许直接把用户句式当正则：
 
 ```python
 slot = rf"(?P<kw>[^\r\n]{{{rule.capture_min},{rule.capture_max}}}?)"
@@ -192,10 +206,10 @@ pattern = regex.escape(prefix) + slot + regex.escape(suffix)
 # full 调用 fullmatch；search 调用 search；捕获从原始字符位置取值。
 ```
 
-- [ ] 归一化保留位置映射：只裁首尾空白、可选裁末尾问号、可选 ASCII A-Z 转 a-z，不改字符长度。返回的 keyword/text 使用原始正文对应切片；模板不跨行。高级正则直接针对保留原文字形的裁剪文本使用匹配标志；开启 ignore_case 时使用 ASCII 大小写模式并在 README 说明其字符类语义。
-- [ ] 正则用 `regex.compile`，匹配调用 `pattern.search(text, timeout=remaining_seconds)` 或 fullmatch。限制 pattern 长度；超时不吞成普通 no_match，保留 `regex_timeout` 诊断原因。
-- [ ] 增加词表限定、`吃`/`吃饭`重叠、search 模式、Emoji、转义花括号、特殊标点、正则命名与编号捕获、可选组为空、病态正则超时测试。避免以单次硬件耗时断言替代超时行为断言。
-- [ ] 全部通过后提交 `feat: add literal template and timeout regex matching`。
+- [x] 归一化保留位置映射：只裁首尾空白、可选裁末尾问号、可选 ASCII A-Z 转 a-z，不改字符长度。返回的 keyword/text 使用原始正文对应切片；模板不跨行。高级正则直接针对保留原文字形的裁剪文本使用匹配标志；开启 ignore_case 时使用 ASCII 大小写模式并在 README 说明其字符类语义。
+- [x] 正则用 `regex.compile`，匹配调用 `pattern.search(text, timeout=remaining_seconds)` 或 fullmatch。限制 pattern 长度；超时不吞成普通 no_match，保留 `regex_timeout` 诊断原因。
+- [x] 增加词表限定、`吃`/`吃饭`重叠、search 模式、Emoji、转义花括号、特殊标点、正则命名与编号捕获、可选组为空、病态正则超时测试。避免以单次硬件耗时断言替代超时行为断言。
+- [x] 全部通过后提交 `feat: add literal template and timeout regex matching`。
 
 ## Task 3：回复模板与候选渲染
 
@@ -203,23 +217,21 @@ pattern = regex.escape(prefix) + slot + regex.escape(suffix)
 
 **Interfaces:** `compile_replies(rule: Rule, capture_names: frozenset[str]) -> ReplyTemplates`；`render_all(templates: ReplyTemplates, match: Match, message: MessageContext, *, max_chars: int) -> tuple[str, ...]`。编译返回文字/token 列表，运行替换只有一遍。
 
-- [ ] 在 conftest.py 增加 `message` fixture：平台 p1、机器人 9000、群 1000、用户 2000/小明、消息 m1、正文我吃什么、未 At。
-- [ ] 写出变量替换、注入保持字面和未知变量失败测试。例如：
+- [x] 在 conftest.py 增加 `message` fixture：平台 p1、机器人 9000、群 1000、用户 2000/小明、消息 m1、正文我吃什么、未 At。
+- [x] 写出变量替换、注入保持字面和未知变量失败测试。例如：
 
 ```python
 def test_capture_is_not_evaluated_again(raw_rule, message):
     rule = load_config({"rules": [raw_rule]}).rules[0]
     templates = compile_replies(rule, frozenset())
     match = Match(keyword="{用户ID}", text="我{用户ID}什么", groups={})
-    assert render_all(templates, match, message, max_chars=2000) == (
-        "是啊{用户ID}什么",
-    )
+    assert render_all(templates, match, message, max_chars=2000) == ("是啊{用户ID}什么",)
 ```
 
-- [ ] 运行 `python -m pytest tests/test_rendering.py -q` 确认失败，再实现单遍 tokenizer。只识别设计说明变量表；`{{`、`}}`输出字面括号；禁止 Python format 的索引、属性和格式说明语法。
-- [ ] 实现上下文值映射和 fallback：用户名为空时取 user_id，私聊群 ID 为空。正则编号/名称必须在 capture_names 中，未参与的合法组值为空。
-- [ ] 对每个候选渲染一次，过滤空白文本和超过 max_reply_chars 的文本；全部无效时该规则没有可发送候选，诊断记录原因。不要截断捕获内容或把 CQ 文本转成消息组件。
-- [ ] 增加中文、换行、重复变量、未知变量、花括号、缺失用户名、可选组、渲染膨胀超长测试。通过后提交 `feat: render safe text reply templates`。
+- [x] 运行 `python -m pytest tests/test_rendering.py -q` 确认失败，再实现单遍 tokenizer。只识别设计说明变量表；`{{`、`}}`输出字面括号；禁止 Python format 的索引、属性和格式说明语法。
+- [x] 实现上下文值映射和 fallback：用户名为空时取 user_id，私聊群 ID 为空。正则编号/名称必须在 capture_names 中，未参与的合法组值为空。
+- [x] 对每个候选渲染一次，过滤空白文本和超过 max_reply_chars 的文本；全部无效时该规则没有可发送候选，诊断记录原因。不要截断捕获内容或把 CQ 文本转成消息组件。
+- [x] 增加中文、换行、重复变量、未知变量、花括号、缺失用户名、可选组、渲染膨胀超长测试。通过后提交 `feat: render safe text reply templates`。
 
 ## Task 4：范围过滤、规则编译和只读评估
 
@@ -227,7 +239,7 @@ def test_capture_is_not_evaluated_again(raw_rule, message):
 
 **Interfaces:** `compile_snapshot(raw: dict, revision: str) -> Snapshot`；`scope_reason(rule: Rule, message: MessageContext) -> str | None`；`evaluate(snapshot: Snapshot, message: MessageContext, *, clock: Callable[[], float]) -> Evaluation`。evaluate 不访问网络、磁盘、RNG 或可变运行状态。
 
-- [ ] 写白/黑名单冲突、require_at、私聊开关、同优先级顺序和编译错误隔离测试：
+- [x] 写白/黑名单冲突、require_at、私聊开关、同优先级顺序和编译错误隔离测试：
 
 ```python
 def test_blacklist_wins(raw_rule, message):
@@ -238,11 +250,11 @@ def test_blacklist_wins(raw_rule, message):
     assert evaluation.traces[0].reason == "scope_denied"
 ```
 
-- [ ] 运行 `python -m pytest tests/test_engine.py -q` 确认失败。
-- [ ] 编译快照依次调用 load_config、compile_matcher、compile_replies，汇总每条规则错误，保持原 order。按 `(-priority, order)`排序成功规则。
-- [ ] 在 evaluate 中先检查配置总开关、私聊总开关、全局平台/用户限制，再按设计说明流程产生 Candidate 和 Trace；全局原因的 Trace.rule_id 使用 `*`。匹配超时隔离当条规则，总预算耗尽返回 `Evaluation((), traces, exhausted=True)`，不能发送预算耗尽前搜到的部分结果。
-- [ ] 用注入 clock 控制总预算测试；每次 matcher timeout 为「单规则上限与总剩余时间」的较小值。配置编译只在加载时发生，不随每条消息重复。
-- [ ] 添加搜索捕获、多个词返回稳定关键词、排除词先于匹配、输出超长候选过滤、全局错误不生成快照测试。通过后提交 `feat: compile rule snapshots and evaluate scoped messages`。
+- [x] 运行 `python -m pytest tests/test_engine.py -q` 确认失败。
+- [x] 编译快照依次调用 load_config、compile_matcher、compile_replies，汇总每条规则错误，保持原 order。按 `(-priority, order)`排序成功规则。
+- [x] 在 evaluate 中先检查配置总开关、私聊总开关、全局平台/用户限制，再按设计说明流程产生 Candidate 和 Trace；全局原因的 Trace.rule_id 使用 `*`。匹配超时隔离当条规则，总预算耗尽返回 `Evaluation((), traces, exhausted=True)`，不能发送预算耗尽前搜到的部分结果。
+- [x] 用注入 clock 控制总预算测试；每次 matcher timeout 为「单规则上限与总剩余时间」的较小值。配置编译只在加载时发生，不随每条消息重复。
+- [x] 添加搜索捕获、多个词返回稳定关键词、排除词先于匹配、输出超长候选过滤、全局错误不生成快照测试。通过后提交 `feat: compile rule snapshots and evaluate scoped messages`。
 
 ## Task 5：回复策略、冷却、去重与原子发送资格
 
@@ -250,8 +262,8 @@ def test_blacklist_wins(raw_rule, message):
 
 **Interfaces:** `RuntimePolicy(clock, rng)`；`async reserve(snapshot, message, evaluation) -> Reservation | None`；`async complete(reservation, outcomes: tuple[SendOutcome, ...]) -> None`；`preview(snapshot, message, evaluation) -> tuple[Trace, ...]`；`export_persistent() -> dict`；`restore_persistent(data: dict) -> None`。跳过原因由 policy.last_reason(message) 查询，状态键按 ScopeKey。
 
-- [ ] 构造可手动推进的 FakeClock 以及固定种子的独立 RNG；不要通过 sleep 测冷却。
-- [ ] 写出以下测试以及 all 模式的一次事件多个 Delivery 测试：
+- [x] 构造可手动推进的 FakeClock 以及固定种子的独立 RNG；不要通过 sleep 测冷却。
+- [x] 写出以下测试以及 all 模式的一次事件多个 Delivery 测试：
 
 ```python
 @pytest.mark.asyncio
@@ -266,8 +278,8 @@ async def test_only_one_concurrent_group_reservation(snapshot, message, evaluati
 
 `snapshot` 和 `evaluation` fixtures 在此任务添加，分别由默认 raw_rule 编译、evaluate 得到。
 
-- [ ] 运行 `python -m pytest tests/test_policy.py -q` 确认失败。
-- [ ] reserve 在同一短临界区内完成检查和占位；临界区不执行匹配、不 await 网络/磁盘。顺序必须固定：
+- [x] 运行 `python -m pytest tests/test_policy.py -q` 确认失败。
+- [x] reserve 在同一短临界区内完成检查和占位；临界区不执行匹配、不 await 网络/磁盘。顺序必须固定：
 
 ```text
 运行时禁用/暂停 → 去重/在途事件 → 群 busy/冷却
@@ -276,11 +288,11 @@ async def test_only_one_concurrent_group_reservation(snapshot, message, evaluati
 → 生成唯一 token，写入在途状态 → 返回 Reservation
 ```
 
-- [ ] complete 根据实际成功列表提交群/规则/用户冷却与游标；失败不推进；至少尝试发送就保留事件去重，全部未尝试则释放。使用 token 防止过期 complete 释放其他事件的预留。finally 清理 busy。
-- [ ] 加入 p=0/1、概率失败后的低优先级接替、冷却后的接替、random 模式候选集合、同级顺序、reply round_robin、多条上限、部分发送失败和缺失消息 ID 测试。
-- [ ] preview 只读状态并返回诊断，不调用 rng；前后对 `rng.getstate()`、export_persistent()、冷却/统计快照做相等断言。
-- [ ] 实现 TTL 和容量回收；容量耗尽时不增长无界字典。管理禁用项不按普通缓存淘汰。
-- [ ] 通过后提交 `feat: enforce reply selection cooldowns and deduplication`。
+- [x] complete 根据实际成功列表提交群/规则/用户冷却与游标；失败不推进；至少尝试发送就保留事件去重，全部未尝试则释放。使用 token 防止过期 complete 释放其他事件的预留。finally 清理 busy。
+- [x] 加入 p=0/1、概率失败后的低优先级接替、冷却后的接替、random 模式候选集合、同级顺序、reply round_robin、多条上限、部分发送失败和缺失消息 ID 测试。
+- [x] preview 只读状态并返回诊断，不调用 rng；前后对 `rng.getstate()`、export_persistent()、冷却/统计快照做相等断言。
+- [x] 实现 TTL 和容量回收；容量耗尽时不增长无界字典。管理禁用项不按普通缓存淘汰。
+- [x] 通过后提交 `feat: enforce reply selection cooldowns and deduplication`。
 
 ## Task 6：持久化与服务工作流
 
@@ -288,29 +300,31 @@ async def test_only_one_concurrent_group_reservation(snapshot, message, evaluati
 
 **Interfaces:** `StateStore(path: Path)`：`async load() -> dict`, `async save(data: dict) -> None`；`ReplyService(snapshot, policy, store, clock)`：`async handle(message: MessageContext, send) -> HandleResult`, `async apply_config(raw: dict, revision: str) -> tuple[ConfigIssue, ...]`, `async update_runtime(action: str, rule_id: str | None, scope: ScopeKey, global_scope: bool) -> None`, `async diagnose(message: MessageContext, rule_id: str | None) -> str`, `async close() -> None`。
 
-- [ ] 存储测试覆盖中文状态往返、非法 JSON、版本不是 1、临时写失败、replace 失败、文件不存在。损坏状态备份保留，插件以「自动回复暂停」恢复并报告，不能静默开启原本暂停的规则。
-- [ ] 服务测试覆盖成功、失败、部分成功和引擎 busy。发送用注入函数，例如：
+- [x] 存储测试覆盖中文状态往返、非法 JSON、版本不是 1、临时写失败、replace 失败、文件不存在。损坏状态备份保留，插件以「自动回复暂停」恢复并报告，不能静默开启原本暂停的规则。
+- [x] 服务测试覆盖成功、失败、部分成功和引擎 busy。发送用注入函数，例如：
 
 ```python
 @pytest.mark.asyncio
 async def test_send_failure_does_not_advance_cursor(service, message):
     before = service.policy.export_persistent()
+
     async def broken_send(text):
         raise OSError("OneBot unavailable")
+
     result = await service.handle(message, broken_send)
     assert result.sent_rule_ids == ()
     assert result.reason == "send_failed"
     assert service.policy.export_persistent() == before
 ```
 
-- [ ] 运行 `python -m pytest tests/test_storage.py tests/test_service.py -q` 确认失败。
-- [ ] 实现 StateStore：异步接口通过 `asyncio.to_thread` 执行文件 I/O；同目录写 temp，flush/fsync 后 os.replace，异常保留旧文件，所有操作串行。
-- [ ] 数据路径设为 `data/plugin_data/astrbot_plugin_keyword_reply/<profile_hash>/state.json`，profile_hash 为规范化绝对配置路径的 SHA-256 前 16 位；状态带 `version: 1`。原子写保存失败时不提交管理状态快照。
-- [ ] 用有两个 token 的 `asyncio.Queue` 做匹配工作许可池，`get_nowait()` 无许可立即返回 busy。拿到许可后 `await asyncio.to_thread(evaluate, ...)`，finally 归还，不用不可终止线程超时制造后台积压。
-- [ ] 服务获得候选后调用 reserve，再依次 await send 并收集 SendOutcome；以 finally 调用 complete。发送不得持有全局配置锁，配置更新只替换快照，已经进入处理的事件继续使用旧快照。
-- [ ] apply_config 在工作线程编译成功后原子替换；全局编译错误保留旧对象；成功更新不重置仍存在规则的 cooldown/dedup，删除规则时剔除孤立游标和禁用 ID。在途事件 complete 只提交当前仍存在规则的持久状态，不能复活已删除 ID。
-- [ ] 管理状态修改立即持久化；游标合并每 30 秒保存；两者经过同一个串行写入口和递增 revision，禁止旧刷盘快照覆盖新管理状态。增加交错保存测试。候选列表改变时游标按新长度取模；close 停止后台循环、等待有界匹配工作结束、刷盘，重复 close 安全。
-- [ ] 通过后提交 `feat: persist runtime controls and coordinate reply delivery`。
+- [x] 运行 `python -m pytest tests/test_storage.py tests/test_service.py -q` 确认失败。
+- [x] 实现 StateStore：异步接口通过 `asyncio.to_thread` 执行文件 I/O；同目录写 temp，flush/fsync 后 os.replace，异常保留旧文件，所有操作串行。
+- [x] 数据路径设为 `data/plugin_data/astrbot_plugin_keyword_reply/<profile_hash>/state.json`，profile_hash 为规范化绝对配置路径的 SHA-256 前 16 位；状态带 `version: 1`。原子写保存失败时不提交管理状态快照。
+- [x] 用有两个 token 的 `asyncio.Queue` 做匹配工作许可池，`get_nowait()` 无许可立即返回 busy。拿到许可后 `await asyncio.to_thread(evaluate, ...)`，finally 归还，不用不可终止线程超时制造后台积压。
+- [x] 服务获得候选后调用 reserve，再依次 await send 并收集 SendOutcome；以 finally 调用 complete。发送不得持有全局配置锁，配置更新只替换快照，已经进入处理的事件继续使用旧快照。
+- [x] apply_config 在工作线程编译成功后原子替换；全局编译错误保留旧对象；成功更新不重置仍存在规则的 cooldown/dedup，删除规则时剔除孤立游标和禁用 ID。在途事件 complete 只提交当前仍存在规则的持久状态，不能复活已删除 ID。
+- [x] 管理状态修改立即持久化；游标合并每 30 秒保存；两者经过同一个串行写入口和递增 revision，禁止旧刷盘快照覆盖新管理状态。增加交错保存测试。候选列表改变时游标按新长度取模；close 停止后台循环、等待有界匹配工作结束、刷盘，重复 close 安全。
+- [x] 通过后提交 `feat: persist runtime controls and coordinate reply delivery`。
 
 ## Task 7：AstrBot / OneBot 消息接入与 AI 共存
 
@@ -318,8 +332,8 @@ async def test_send_failure_does_not_advance_cursor(service, message):
 
 **Interfaces:** `extract_message(event) -> MessageContext`；Star 的 `__init__(context, config)`、`initialize()`、自动消息 handler、`terminate()`。main.py 调用 ReplyService，不重新实现引擎规则。
 
-- [ ] 在独立集成环境使用官方 AstrBot v4.28.0 以及用户实际 4.28.x 补丁版本；记录版本和测试命令。未取得用户的实例时使用本地框架测试，并在最终验收记录中明确真实群未验收。
-- [ ] 先写消息提取测试：顶层 Plain 拼接、引用正文排除、真实 At 判定、群号取 get_group_id、自己的 QQ 号过滤、平台实例隔离、前缀保持。
+- [x] 在独立集成环境使用官方 AstrBot v4.28.0 以及用户实际 4.28.x 补丁版本；记录版本和测试命令。未取得用户的实例时使用本地框架测试，并在最终验收记录中明确真实群未验收。
+- [x] 先写消息提取测试：顶层 Plain 拼接、引用正文排除、真实 At 判定、群号取 get_group_id、自己的 QQ 号过滤、平台实例隔离、前缀保持。
 
 ```python
 def test_raw_plain_is_used_when_framework_stripped_prefix(onebot_event):
@@ -331,25 +345,23 @@ def test_raw_plain_is_used_when_framework_stripped_prefix(onebot_event):
 
 `onebot_event` fixture 用真实 4.28 AstrBotMessage 和平台元数据构造，send 替换为可控适配器；不能靠一个随意 mock 的私有字段证明框架兼容。
 
-- [ ] 运行 `python -m pytest tests/integration/test_astrbot_adapter.py -q` 确认行为失败，再实现提取与平台判断。正文不从已经剥离唤醒词的 event.message_str 获取。
-- [ ] 注册自动消息入口，示意公共 API 用法如下：
+- [x] 运行 `python -m pytest tests/integration/test_astrbot_adapter.py -q` 确认行为失败，再实现提取与平台判断。正文不从已经剥离唤醒词的 event.message_str 获取。
+- [x] 注册自动消息入口，示意公共 API 用法如下：
 
 ```python
 @filter.platform_adapter_type(filter.PlatformAdapterType.AIOCQHTTP)
 @filter.event_message_type(filter.EventMessageType.ALL, priority=10)
 async def on_message(self, event: AstrMessageEvent):
     message = extract_message(event)
-    await self.service.handle(
-        message, lambda text: event.send(event.plain_result(text))
-    )
+    await self.service.handle(message, lambda text: event.send(event.plain_result(text)))
 ```
 
 正式入口在调用 service 前还须排除管理事件、自身消息和 command 前缀；示意不能替代这些检查。正常自动回复不要调用 stop_event，不直接写 `_has_send_oper`，不自行调用 LLM。
 
-- [ ] 写真实 ProcessStage 集成断言：成功发送后默认 Agent 不被调用；未命中且原本唤醒时 Agent 可被调用；其他 handler 继续；冷却、发送失败、regex_timeout 不强行关闭原流程。检查 4.28.0 对 `should_call_llm` 的消费逻辑，但实现不依赖该方法。
-- [ ] initialize 加载状态与配置，启动每 2 秒检查 config.config_path 修改时间的任务；保存触发后解析并 apply_config。检查任务和游标刷盘任务都在 terminate 中取消并清理。完整框架重载后的新对象负责重新加载，不遗留旧任务。
-- [ ] metadata 填 name/display_name/version/desc/support_platforms（aiocqhttp）/astrbot_version。作者与仓库地址使用实施时真实项目资料，禁止编造发布仓库；本地验收无需发布到市场。
-- [ ] 通过后提交 `feat: integrate keyword replies with AstrBot 4.28 OneBot events`。
+- [x] 写真实 ProcessStage 集成断言：成功发送后默认 Agent 不被调用；未命中且原本唤醒时 Agent 可被调用；其他 handler 继续；冷却、发送失败、regex_timeout 不强行关闭原流程。检查 4.28.0 对 `should_call_llm` 的消费逻辑，但实现不依赖该方法。
+- [x] initialize 加载状态与配置，启动每 2 秒检查 config.config_path 修改时间的任务；保存触发后解析并 apply_config。检查任务和游标刷盘任务都在 terminate 中取消并清理。完整框架重载后的新对象负责重新加载，不遗留旧任务。
+- [x] metadata 填 name/display_name/version/desc/support_platforms（aiocqhttp）/astrbot_version。作者与仓库地址使用实施时真实项目资料，禁止编造发布仓库；本地验收无需发布到市场。
+- [x] 通过后提交 `feat: integrate keyword replies with AstrBot 4.28 OneBot events`。
 
 ## Task 8：管理员命令和可解释测试
 
@@ -357,23 +369,23 @@ async def on_message(self, event: AstrMessageEvent):
 
 **Interfaces:** `parse_command(text: str) -> ParsedCommand | None`；`ParsedCommand(action: str, rule_id: str | None, scope: str, text: str, page: int)` 在 commands.py 定义；`async execute_command(service, command, context, is_admin: bool) -> str` 返回只包含文字的报告。
 
-- [ ] 先按设计说明的完整命令表写参数化测试，包括权限拒绝、未知 ID、非法页码、here/global、中文别名、testat、暂停后仍能 resume。
+- [x] 先按设计说明的完整命令表写参数化测试，包括权限拒绝、未知 ID、非法页码、here/global、中文别名、testat、暂停后仍能 resume。
 
 ```python
 def test_test_command_keeps_body_whitespace():
-    parsed = parse_command('kwr test echo 我  吃什么\n第二行')
+    parsed = parse_command("kwr test echo 我  吃什么\n第二行")
     assert parsed.action == "test"
     assert parsed.rule_id == "echo"
     assert parsed.text == "我  吃什么\n第二行"
 ```
 
-- [ ] 运行 `python -m pytest tests/test_commands.py -q` 确认失败。解析管理语法用有限次 split，仅提取指令名、动作、ID，其余正文原样保留；不执行 shell，不使用 shlex 改写测试正文。
-- [ ] 命令 handler 优先级设为 100，明确机器人管理员鉴权；所有管理路径同一鉴权入口，包括 list/show/test。识别到管理命令即标记 `keyword_reply.management_event`；自动监听同时检查标记和指令名，未授权管理命令也不能当自动回复正文处理。
-- [ ] on/off/pause/resume/reset 只通过 update_runtime 修改运行状态，here/global 互不混淆。on/resume 不解除面板禁用、黑名单或其他层级的暂停，报告具体剩余限制。
-- [ ] test/testat await service.diagnose，使用与正式消息同一个 evaluate/render 路径和有限匹配工作许可，仅取 policy.preview；testat 把模拟 MessageContext.mentioned_bot 设为 true。报告顺序为「总体结论 → 规则命中 → 捕获 → 候选 → 冷却/概率/排序 → 错误」。概率显示数值，不抽样；随机不实际选择候选。暂时没有匹配许可时直接报告忙，不增加正式 busy 统计。
-- [ ] 写测试前后服务状态深比较，验证 RNG、游标、去重、冷却、统计和文件没有变化。仅真正执行的管理开关保存状态，查看和测试不得写文件。
-- [ ] list 每页 10 项；报告输出上限 4000 字符，超过时显示省略条数和下一页方式。说明显示的候选是诊断文本，不是向群里逐条实际发送候选。
-- [ ] 通过后提交 `feat: add admin controls and side-effect-free rule diagnostics`。
+- [x] 运行 `python -m pytest tests/test_commands.py -q` 确认失败。解析管理语法用有限次 split，仅提取指令名、动作、ID，其余正文原样保留；不执行 shell，不使用 shlex 改写测试正文。
+- [x] 命令 handler 优先级设为 100，明确机器人管理员鉴权；所有管理路径同一鉴权入口，包括 list/show/test。识别到管理命令即标记 `keyword_reply.management_event`；自动监听同时检查标记和指令名，未授权管理命令也不能当自动回复正文处理。
+- [x] on/off/pause/resume/reset 只通过 update_runtime 修改运行状态，here/global 互不混淆。on/resume 不解除面板禁用、黑名单或其他层级的暂停，报告具体剩余限制。
+- [x] test/testat await service.diagnose，使用与正式消息同一个 evaluate/render 路径和有限匹配工作许可，仅取 policy.preview；testat 把模拟 MessageContext.mentioned_bot 设为 true。报告顺序为「总体结论 → 规则命中 → 捕获 → 候选 → 冷却/概率/排序 → 错误」。概率显示数值，不抽样；随机不实际选择候选。暂时没有匹配许可时直接报告忙，不增加正式 busy 统计。
+- [x] 写测试前后服务状态深比较，验证 RNG、游标、去重、冷却、统计和文件没有变化。仅真正执行的管理开关保存状态，查看和测试不得写文件。
+- [x] list 每页 10 项；报告输出上限 4000 字符，超过时显示省略条数和下一页方式。说明显示的候选是诊断文本，不是向群里逐条实际发送候选。
+- [x] 通过后提交 `feat: add admin controls and side-effect-free rule diagnostics`。
 
 ## Task 9：中文配置表单、示例和使用文档
 
@@ -381,7 +393,7 @@ def test_test_command_keeps_body_whitespace():
 
 **Interfaces:** Schema 输出必须被 load_config 正确解析；默认规则列表可以为空，示例从 examples/rules.json 复制。列表模板统一复用同一字段名，不为 UI 增加第二套业务字段。
 
-- [ ] 先写 Schema 与业务默认值对应、模板字段无遗漏、全部示例编译成功的测试：
+- [x] 先写 Schema 与业务默认值对应、模板字段无遗漏、全部示例编译成功的测试：
 
 ```python
 def test_all_examples_are_valid():
@@ -392,8 +404,8 @@ def test_all_examples_are_valid():
 ```
 
 - [ ] 运行 `python -m pytest tests/test_schema.py -q` 确认失败，再创建「关键词」「句式」「正则」三个原生模板；字段保存结构保持扁平，通过描述前缀与排序组织基本/匹配/范围/回复/限制，中文说明必须写明空列表、0 秒、概率0/1、full/search 的语义。
-- [ ] 使用原生支持的 string/text/bool/int/float/object/list/template_list；候选回复为 string 列表，一项一条，不用换行拆分多条候选，因为单条文字本身允许换行。
-- [ ] 填写下列完整可运行示例，全部默认 `enabled=false`，由用户按需启用：
+- [x] 使用原生支持的 string/text/bool/int/float/object/list/template_list；候选回复为 string 列表，一项一条，不用换行拆分多条候选，因为单条文字本身允许换行。
+- [x] 填写下列完整可运行示例，全部默认 `enabled=false`，由用户按需启用：
 
 ```json
 {
@@ -415,7 +427,7 @@ def test_all_examples_are_valid():
 }
 ```
 
-- [ ] README 按用户任务编写：安装到 data/plugins、配置第一条规则、切换词表/任意模式、设置群限制、随机回复、管理员开关、测试不命中的原因、保存生效、升级备份、纯文字限制与 AI 共存。明确 `[关键词]` 是示意，实际用 `{关键词}`。
+- [x] README 按用户任务编写：安装到 data/plugins、配置第一条规则、切换词表/任意模式、设置群限制、随机回复、管理员开关、测试不命中的原因、保存生效、升级备份、纯文字限制与 AI 共存。明确 `[关键词]` 是示意，实际用 `{关键词}`。
 - [ ] 在真实 4.28 WebUI 手动新增每种模板，保存后重新打开，核对类型与 list 结构；验证只输入关键字段即可工作，高级选项无需全填。不能只依赖 Schema JSON 语法检查声称 UI 可用。
 - [ ] 通过后提交 `docs: add native configuration forms and keyword reply examples`。
 
@@ -425,7 +437,7 @@ def test_all_examples_are_valid():
 
 **Interfaces:** 本项不新增功能，输出可复查的测试记录和可安装插件目录/压缩包。
 
-- [ ] 执行完整自动化检查：
+- [x] 执行完整自动化检查：
 
 ```powershell
 python -m pytest tests -q
@@ -436,7 +448,7 @@ python -m compileall -q main.py keyword_reply
 
 单元测试可独立运行；integration 需要真实 AstrBot 环境。如果分两个环境运行，分别记录成功/失败数量，禁止把跳过集成测试描述为集成通过。
 
-- [ ] 在本地记录 500 条普通规则、4096 字符消息、至少 1000 次评估的中位数/p95，预热后计时；目标普通规则 p95<50ms，网络发送时间不计入。另测混合正则、超时规则和高并发许可池；不做未经测量的吞吐承诺。
+- [x] 在本地记录 500 条普通规则、4096 字符消息、至少 1000 次评估的中位数/p95，预热后计时；目标普通规则 p95<50ms，网络发送时间不计入。另测混合正则、超时规则和高并发许可池；不做未经测量的吞吐承诺。
 - [ ] 在测试群按以下顺序验收，每步记录消息、配置摘要、实际结果、日期和实际 OneBot 实现：
 
 | 步骤 | 操作 | 预期 |
@@ -459,7 +471,7 @@ python -m compileall -q main.py keyword_reply
 | 16 | 卸载/重载、检查后台任务 | 原任务清理，无重复监听或持续写盘 |
 
 - [ ] 根据证据修复失败，重跑对应测试及受影响集成测试，再做一次最终检查。通过后才填写验收结果；真实 QQ 环境不可用时明确列为未验收，不伪造通过。
-- [ ] 整理安装包，排除 .venv、.git、缓存、测试群消息与实际运行状态。用户只要求本地插件时不发布市场、不创建远程仓库。
+- [x] 整理安装包，排除 .venv、.git、缓存、测试群消息与实际运行状态。用户只要求本地插件时不发布市场、不创建远程仓库。
 - [ ] 提交 `test: verify keyword reply behavior on AstrBot 4.28`，报告版本、测试结论、真实群验收范围和已知限制。
 
 ## 覆盖关系与完成定义
