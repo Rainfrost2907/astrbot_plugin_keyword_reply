@@ -1,0 +1,28 @@
+{
+  "rules": [
+    {
+      "__template_key": "template",
+      "id": "echo",
+      "name": "限定词表接话",
+      "enabled": false,
+      "match_type": "template",
+      "pattern": "我{关键词}什么",
+      "capture_mode": "keywords",
+      "keywords": ["吃", "喝"],
+      "replies": ["是啊{关键词}什么"],
+      "allowed_group_ids": [],
+      "require_at": false
+    },
+    {
+      "__template_key": "keyword",
+      "id": "goodnight",
+      "name": "晚安",
+      "enabled": false,
+      "match_type": "contains",
+      "keywords": ["晚安"],
+      "replies": ["晚安，{用户名}！", "早点休息～"],
+      "allowed_group_ids": [],
+      "require_at": false
+    }
+  ]
+}

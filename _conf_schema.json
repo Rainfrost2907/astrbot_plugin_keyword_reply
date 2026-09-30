@@ -1,0 +1,218 @@
+{
+  "enabled": {
+    "type": "bool",
+    "description": "启用插件",
+    "default": true
+  },
+  "group_cooldown_seconds": {
+    "type": "float",
+    "description": "群聊回复间隔（秒）",
+    "hint": "默认3秒，0表示不限。仅成功回复后开始计时。",
+    "default": 3.0
+  },
+  "rules": {
+    "type": "template_list",
+    "description": "回复规则",
+    "hint": "新增关键词或句式规则。按列表顺序，第一条命中后只回复一次。填完再启用。",
+    "default": [],
+    "templates": {
+      "keyword": {
+        "name": "关键词回复",
+        "display_item": "name",
+        "hint": "消息包含关键词时回复。",
+        "items": {
+          "id": {
+            "type": "string",
+            "description": "规则ID",
+            "default": "",
+            "hint": "例如 echo、goodnight；英文、数字、下划线或短横线，不能重复。用于聊天指令。"
+          },
+          "name": {
+            "type": "string",
+            "description": "名称",
+            "default": ""
+          },
+          "enabled": {
+            "type": "bool",
+            "description": "启用",
+            "default": false
+          },
+          "keywords": {
+            "type": "list",
+            "description": "关键词",
+            "default": [],
+            "hint": "每项一个词，命中任意一个即可。"
+          },
+          "replies": {
+            "type": "list",
+            "description": "回复",
+            "default": [],
+            "hint": "一项就是一条回复，多项时随机选一条。支持 {关键词}、{用户名} 等文字变量。"
+          },
+          "allowed_group_ids": {
+            "type": "list",
+            "description": "适用群",
+            "default": [],
+            "hint": "每项一个群号；留空适用全部群。"
+          },
+          "require_at": {
+            "type": "bool",
+            "description": "需要@机器人",
+            "default": false,
+            "hint": "开启后必须直接@机器人；引用和@全体不算。"
+          },
+          "match_type": {
+            "type": "string",
+            "description": "规则类型",
+            "default": "contains",
+            "invisible": true
+          }
+        }
+      },
+      "template": {
+        "name": "句式接话",
+        "display_item": "name",
+        "hint": "例如：我吃什么 → 是啊吃什么。",
+        "items": {
+          "id": {
+            "type": "string",
+            "description": "规则ID",
+            "default": "",
+            "hint": "例如 echo、goodnight；英文、数字、下划线或短横线，不能重复。用于聊天指令。"
+          },
+          "name": {
+            "type": "string",
+            "description": "名称",
+            "default": ""
+          },
+          "enabled": {
+            "type": "bool",
+            "description": "启用",
+            "default": false
+          },
+          "pattern": {
+            "type": "text",
+            "description": "句式",
+            "default": "我{关键词}什么",
+            "hint": "例如：我{关键词}什么。整条消息匹配，首尾空白自动去掉。"
+          },
+          "capture_mode": {
+            "type": "string",
+            "description": "捕获内容",
+            "default": "any",
+            "hint": "any：任意内容；keywords：仅限关键词列表。",
+            "options": [
+              "any",
+              "keywords"
+            ]
+          },
+          "keywords": {
+            "type": "list",
+            "description": "关键词",
+            "default": [],
+            "hint": "每项一个词，命中任意一个即可。",
+            "condition": {
+              "capture_mode": "keywords"
+            }
+          },
+          "replies": {
+            "type": "list",
+            "description": "回复",
+            "default": [],
+            "hint": "一项就是一条回复，多项时随机选一条。支持 {关键词}、{用户名} 等文字变量。"
+          },
+          "allowed_group_ids": {
+            "type": "list",
+            "description": "适用群",
+            "default": [],
+            "hint": "每项一个群号；留空适用全部群。"
+          },
+          "require_at": {
+            "type": "bool",
+            "description": "需要@机器人",
+            "default": false,
+            "hint": "开启后必须直接@机器人；引用和@全体不算。"
+          },
+          "match_type": {
+            "type": "string",
+            "description": "规则类型",
+            "default": "template",
+            "invisible": true
+          }
+        }
+      }
+    }
+  },
+  "allow_private": {
+    "type": "string",
+    "description": "旧版升级检查",
+    "default": "__retired_in_v2__",
+    "invisible": true
+  },
+  "blocked_user_ids": {
+    "type": "string",
+    "description": "旧版升级检查",
+    "default": "__retired_in_v2__",
+    "invisible": true
+  },
+  "dedup_ttl_seconds": {
+    "type": "string",
+    "description": "旧版升级检查",
+    "default": "__retired_in_v2__",
+    "invisible": true
+  },
+  "evaluation_budget_ms": {
+    "type": "string",
+    "description": "旧版升级检查",
+    "default": "__retired_in_v2__",
+    "invisible": true
+  },
+  "ignore_command_prefixes": {
+    "type": "string",
+    "description": "旧版升级检查",
+    "default": "__retired_in_v2__",
+    "invisible": true
+  },
+  "max_input_chars": {
+    "type": "string",
+    "description": "旧版升级检查",
+    "default": "__retired_in_v2__",
+    "invisible": true
+  },
+  "max_replies": {
+    "type": "string",
+    "description": "旧版升级检查",
+    "default": "__retired_in_v2__",
+    "invisible": true
+  },
+  "max_reply_chars": {
+    "type": "string",
+    "description": "旧版升级检查",
+    "default": "__retired_in_v2__",
+    "invisible": true
+  },
+  "max_rules": {
+    "type": "string",
+    "description": "旧版升级检查",
+    "default": "__retired_in_v2__",
+    "invisible": true
+  },
+  "platform_ids": {
+    "type": "string",
+    "description": "旧版升级检查",
+    "default": "__retired_in_v2__",
+    "invisible": true
+  },
+  "regex_timeout_ms": {
+    "type": "string",
+    "description": "旧版升级检查",
+    "default": "__retired_in_v2__",
+    "invisible": true
+  },
+  "selection_mode": {
+    "type": "string",
+    "description": "旧版升级检查",
+    "default": "__retired_in_v2__",
+    "invisible": true
+  }
+}
